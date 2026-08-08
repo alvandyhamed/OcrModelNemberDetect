@@ -3,6 +3,7 @@ import io
 import zipfile
 import json
 import boto3
+from botocore.client import Config
 from botocore.exceptions import ClientError
 
 MINIO_ENDPOINT = os.environ.get('MINIO_ENDPOINT', 'http://minio:9000')
@@ -20,6 +21,7 @@ def get_s3_client():
             endpoint_url=MINIO_ENDPOINT,
             aws_access_key_id=MINIO_ACCESS_KEY,
             aws_secret_access_key=MINIO_SECRET_KEY,
+            config=Config(signature_version='s3v4'),
             region_name='us-east-1'
         )
         ensure_bucket_exists()
@@ -63,7 +65,6 @@ def extract_zip_file_to_minio(zip_source, dataset_prefix):
             clean_rel_path = filename.lstrip('/')
             object_key = f"raw_uploads/{dataset_prefix}/{clean_rel_path}"
             
-            # Stream read object from zip to avoid high memory usage
             with z.open(file_info) as f:
                 file_data = f.read()
             
