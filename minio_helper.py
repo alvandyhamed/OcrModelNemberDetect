@@ -12,11 +12,13 @@ MINIO_SECRET_KEY = os.environ.get('MINIO_SECRET_KEY', '1MP6rLEyoGKVAoUaNJoMDW2F'
 MINIO_BUCKET = os.environ.get('MINIO_BUCKET', 'chart-ocr-datasets')
 
 def get_s3_client():
-    return boto3.client(
-        's3',
-        endpoint_url=MINIO_ENDPOINT,
+    session = boto3.Session(
         aws_access_key_id=MINIO_ACCESS_KEY,
         aws_secret_access_key=MINIO_SECRET_KEY,
+    )
+    return session.client(
+        's3',
+        endpoint_url=MINIO_ENDPOINT,
         config=Config(
             signature_version='s3v4',
             s3={'addressing_style': 'path'}
