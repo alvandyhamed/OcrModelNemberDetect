@@ -51,30 +51,43 @@ def extract_zip_file_to_minio(zip_source, dataset_prefix):
         for file_info in z.infolist():
             if file_info.is_dir():
                 continue
-            filename = file_info.filename
-            if filename.startswith('__MACOSX') or filename.endswith('.DS_Store') or os.path.basename(filename).startswith('.'):
+            
+            raw_filename = file_info.filename
+            try:
+                if file_info.flag_bits & 0x800 == 0:
+                    filename = raw_filename.encode('cp437').decode('utf-8')
+                else:
+                    filename = raw_filename
+            except Exception:
+                filename = raw_filename
+                
+            base_name = os.path.basename(filename)
+            if filename.startswith('__MACOSX') or filename.endswith('.DS_Store') or base_name.startswith('.'):
                 continue
                 
             clean_rel_path = filename.lstrip('/')
             object_key = f"raw_uploads/{dataset_prefix}/{clean_rel_path}"
             
-            with z.open(file_info) as f:
-                file_data = f.read()
-            
-            ext = os.path.splitext(filename)[1].lower()
-            content_type = 'image/png' if ext == '.png' else ('image/jpeg' if ext in ['.jpg', '.jpeg'] else 'application/octet-stream')
-            
-            s3.put_object(
-                Bucket=MINIO_BUCKET,
-                Key=object_key,
-                Body=file_data,
-                ContentType=content_type
-            )
-            extracted_files.append({
-                "filename": os.path.basename(filename),
-                "key": object_key,
-                "size": len(file_data)
-            })
+            try:
+                with z.open(file_info) as f:
+                    file_data = f.read()
+                
+                ext = os.path.splitext(filename)[1].lower()
+                content_type = 'image/png' if ext == '.png' else ('image/jpeg' if ext in ['.jpg', '.jpeg'] else 'application/octet-stream')
+                
+                s3.put_object(
+                    Bucket=MINIO_BUCKET,
+                    Key=object_key,
+                    Body=file_data,
+                    ContentType=content_type
+                )
+                extracted_files.append({
+                    "filename": base_name,
+                    "key": object_key,
+                    "size": len(file_data)
+                })
+            except Exception as item_err:
+                print(f"Warning: Failed to extract item {filename}: {item_err}")
             
     return extracted_files
 
