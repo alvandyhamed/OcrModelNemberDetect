@@ -44,28 +44,29 @@ def upload_file_bytes(object_key, file_bytes, content_type='application/octet-st
     )
     return f"{MINIO_ENDPOINT}/{MINIO_BUCKET}/{object_key}"
 
-def extract_zip_to_minio(zip_bytes, dataset_prefix):
+def extract_zip_file_to_minio(zip_source, dataset_prefix):
     """
-    Extract a ZIP archive into MinIO under raw_uploads/<dataset_prefix>/
+    Extract a ZIP archive (file path or file object) into MinIO under raw_uploads/<dataset_prefix>/
+    Streams file contents to prevent RAM spikes on 250MB+ datasets.
     """
     s3 = get_s3_client()
     extracted_files = []
     
-    with zipfile.ZipFile(io.BytesIO(zip_bytes), 'r') as z:
+    with zipfile.ZipFile(zip_source, 'r') as z:
         for file_info in z.infolist():
             if file_info.is_dir():
                 continue
             filename = file_info.filename
-            if filename.startswith('__MACOSX') or filename.endswith('.DS_Store'):
+            if filename.startswith('__MACOSX') or filename.endswith('.DS_Store') or os.path.basename(filename).startswith('.'):
                 continue
                 
-            # Keep clean relative path
             clean_rel_path = filename.lstrip('/')
             object_key = f"raw_uploads/{dataset_prefix}/{clean_rel_path}"
             
-            file_data = z.read(filename)
+            # Stream read object from zip to avoid high memory usage
+            with z.open(file_info) as f:
+                file_data = f.read()
             
-            # Determine content type
             ext = os.path.splitext(filename)[1].lower()
             content_type = 'image/png' if ext == '.png' else ('image/jpeg' if ext in ['.jpg', '.jpeg'] else 'application/octet-stream')
             
@@ -84,9 +85,6 @@ def extract_zip_to_minio(zip_bytes, dataset_prefix):
     return extracted_files
 
 def list_raw_datasets():
-    """
-    List top-level dataset folder names in raw_uploads/
-    """
     s3 = get_s3_client()
     paginator = s3.get_paginator('list_objects_v2')
     datasets = set()
@@ -101,9 +99,6 @@ def list_raw_datasets():
     return sorted(list(datasets))
 
 def list_dataset_images(dataset_name):
-    """
-    List all image object keys inside raw_uploads/<dataset_name>/
-    """
     s3 = get_s3_client()
     paginator = s3.get_paginator('list_objects_v2')
     image_keys = []

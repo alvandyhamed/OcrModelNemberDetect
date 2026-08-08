@@ -11,6 +11,7 @@ import easyocr
 import minio_helper
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
+app.config['MAX_CONTENT_LENGTH'] = 1000 * 1024 * 1024  # Support up to 1GB dataset ZIP uploads
 
 UPLOAD_FOLDER = os.path.join(app.root_path, 'uploads')
 OUTPUT_FOLDER = os.path.join(app.root_path, 'extracted_output')
@@ -315,9 +316,17 @@ def minio_upload_zip():
         return jsonify({"error": "File must be a .zip archive"}), 400
         
     dataset_name = os.path.splitext(file.filename)[0].replace(' ', '_')
-    zip_bytes = file.read()
     
-    extracted_files = minio_helper.extract_zip_to_minio(zip_bytes, dataset_name)
+    # Save to temporary disk file to stream read without RAM spikes
+    temp_path = os.path.join(UPLOAD_FOLDER, f"temp_{dataset_name}.zip")
+    file.save(temp_path)
+    
+    try:
+        extracted_files = minio_helper.extract_zip_file_to_minio(temp_path, dataset_name)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+            
     return jsonify({
         "success": True,
         "dataset_name": dataset_name,
