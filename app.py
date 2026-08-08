@@ -1,10 +1,14 @@
 import os
+import io
 import json
 import glob
 import cv2
 import numpy as np
-from flask import Flask, render_template, request, jsonify, send_from_directory, send_file
+import zipfile
+from flask import Flask, render_template, request, jsonify, send_from_directory, send_file, Response
 import easyocr
+
+import minio_helper
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
@@ -26,9 +30,6 @@ def get_ocr_reader():
     return reader
 
 def extract_isolated_digits(gray, reader):
-    """
-    Extract small/isolated digits (e.g. axis ticks 0, 1, 2, 3, 4, 5) using ROI contours.
-    """
     _, thresh = cv2.threshold(gray, 160, 255, cv2.THRESH_BINARY_INV)
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
@@ -55,27 +56,27 @@ def extract_isolated_digits(gray, reader):
                     isolated_results.append((bbox, text_clean, conf))
     return isolated_results
 
-def process_single_image(filepath, param_block_size=15, param_c=8):
+def process_chart_bytes(img_bytes, filename, save_to_minio=False, dataset_name=None):
+    """
+    Process image bytes from memory (local or MinIO) and run OCR & Digit extraction.
+    """
     ocr = get_ocr_reader()
-    img = cv2.imread(filepath)
+    nparr = np.frombuffer(img_bytes, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     if img is None:
         return None
-    
-    filename = os.path.basename(filepath)
-    base_name = os.path.splitext(filename)[0]
+        
+    base_name = os.path.splitext(os.path.basename(filename))[0]
     h_img, w_img = img.shape[:2]
     
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     binarized = cv2.adaptiveThreshold(
         gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-        cv2.THRESH_BINARY_INV, param_block_size, param_c
+        cv2.THRESH_BINARY_INV, 15, 8
     )
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
     cleaned = cv2.morphologyEx(binarized, cv2.MORPH_OPEN, kernel)
     cleaned_bg = cv2.bitwise_not(cleaned)
-    
-    clean_path = os.path.join(OUTPUT_FOLDER, f"{base_name}_cleaned.png")
-    cv2.imwrite(clean_path, cleaned_bg)
     
     raw_results = ocr.readtext(img)
     clean_results = ocr.readtext(cleaned_bg)
@@ -110,7 +111,6 @@ def process_single_image(filepath, param_block_size=15, param_c=8):
             ys = [pt[1] for pt in coords]
             x, y, w, h = min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)
             
-            # Save crop snippet image
             pad = 4
             x1, y1 = max(0, x - pad), max(0, y - pad)
             x2, y2 = min(w_img, x + w + pad), min(h_img, y + h + pad)
@@ -118,23 +118,34 @@ def process_single_image(filepath, param_block_size=15, param_c=8):
             
             crop_id = len(detections) + 1
             crop_filename = f"{base_name}_crop_{crop_id}.png"
-            crop_filepath = os.path.join(CROPS_FOLDER, crop_filename)
-            if crop_img.size > 0:
-                cv2.imwrite(crop_filepath, crop_img)
+            
+            # Encode crop image to bytes
+            _, crop_buf = cv2.imencode('.png', crop_img)
+            crop_bytes = crop_buf.tobytes() if crop_img.size > 0 else b''
+            
+            crop_url = f"/files/crops/{crop_filename}"
+            if save_to_minio and dataset_name:
+                crop_key = f"processed_datasets/{dataset_name}/crops/{crop_filename}"
+                minio_helper.upload_file_bytes(crop_key, crop_bytes, 'image/png')
+                crop_url = f"/files/minio/{crop_key}"
+            else:
+                crop_filepath = os.path.join(CROPS_FOLDER, crop_filename)
+                if crop_img.size > 0:
+                    cv2.imwrite(crop_filepath, crop_img)
             
             is_num = clean_t.replace('.', '').replace('-', '').replace(',', '').isdigit()
             
             item = {
                 "id": crop_id,
                 "predicted_text": clean_t,
-                "user_verified_text": clean_t, # default to prediction
+                "user_verified_text": clean_t,
                 "confidence": round(float(conf), 3),
                 "is_numeric": is_num,
                 "type": "NUMBER" if is_num else "TEXT",
                 "box": {"x": x, "y": y, "w": w, "h": h},
                 "polygon": coords,
                 "source": src,
-                "crop_url": f"/files/crops/{crop_filename}"
+                "crop_url": crop_url
             }
             seen_boxes.append(item)
             detections.append(item)
@@ -144,11 +155,9 @@ def process_single_image(filepath, param_block_size=15, param_c=8):
     add_res(isolated_digits, "contour_digit")
     
     detections.sort(key=lambda d: (d["box"]["y"], d["box"]["x"]))
-    # Re-assign sequential IDs
     for idx, d in enumerate(detections, 1):
         d["id"] = idx
 
-    # Draw visual annotations
     annotated = img.copy()
     for d in detections:
         pts = np.array(d["polygon"], np.int32).reshape((-1, 1, 2))
@@ -162,27 +171,53 @@ def process_single_image(filepath, param_block_size=15, param_c=8):
             cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1, cv2.LINE_AA
         )
         
-    ann_path = os.path.join(OUTPUT_FOLDER, f"{base_name}_annotated.png")
-    cv2.imwrite(ann_path, annotated)
+    _, ann_buf = cv2.imencode('.png', annotated)
+    ann_bytes = ann_buf.tobytes()
     
+    _, clean_buf = cv2.imencode('.png', cleaned_bg)
+    clean_bytes = clean_buf.tobytes()
+    
+    if save_to_minio and dataset_name:
+        ann_key = f"processed_datasets/{dataset_name}/annotated/{base_name}_annotated.png"
+        clean_key = f"processed_datasets/{dataset_name}/cleaned/{base_name}_cleaned.png"
+        minio_helper.upload_file_bytes(ann_key, ann_bytes, 'image/png')
+        minio_helper.upload_file_bytes(clean_key, clean_bytes, 'image/png')
+        
+        annotated_url = f"/files/minio/{ann_key}"
+        cleaned_url = f"/files/minio/{clean_key}"
+        image_url = f"/files/minio/raw_uploads/{dataset_name}/{filename}"
+    else:
+        ann_path = os.path.join(OUTPUT_FOLDER, f"{base_name}_annotated.png")
+        clean_path = os.path.join(OUTPUT_FOLDER, f"{base_name}_cleaned.png")
+        cv2.imwrite(ann_path, annotated)
+        cv2.imwrite(clean_path, cleaned_bg)
+        
+        annotated_url = f"/files/output/{base_name}_annotated.png"
+        cleaned_url = f"/files/output/{base_name}_cleaned.png"
+        image_url = f"/files/uploads/{filename}"
+        
     data = {
         "filename": filename,
         "base_name": base_name,
         "image_width": w_img,
         "image_height": h_img,
-        "image_url": f"/files/uploads/{filename}",
-        "cleaned_url": f"/files/output/{base_name}_cleaned.png",
-        "annotated_url": f"/files/output/{base_name}_annotated.png",
+        "image_url": image_url,
+        "cleaned_url": cleaned_url,
+        "annotated_url": annotated_url,
         "total_count": len(detections),
         "number_count": sum(1 for d in detections if d["is_numeric"]),
         "text_count": sum(1 for d in detections if not d["is_numeric"]),
         "detections": detections
     }
     
-    json_path = os.path.join(OUTPUT_FOLDER, f"{base_name}_data.json")
-    with open(json_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-        
+    if save_to_minio and dataset_name:
+        json_key = f"processed_datasets/{dataset_name}/json/{base_name}_data.json"
+        minio_helper.save_json_to_minio(json_key, data)
+    else:
+        json_path = os.path.join(OUTPUT_FOLDER, f"{base_name}_data.json")
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+            
     return data
 
 @app.route('/')
@@ -205,7 +240,10 @@ def process():
     else:
         return jsonify({"error": "No filename provided"}), 400
         
-    result = process_single_image(filepath)
+    with open(filepath, 'rb') as f:
+        img_bytes = f.read()
+        
+    result = process_chart_bytes(img_bytes, filename)
     if result:
         return jsonify(result)
     return jsonify({"error": "Failed to process image"}), 500
@@ -216,7 +254,7 @@ def update_label():
     base_name = body.get('base_name')
     detection_id = body.get('detection_id')
     new_text = body.get('text')
-    new_type = body.get('type')  # 'NUMBER' or 'TEXT'
+    new_type = body.get('type')
     
     json_path = os.path.join(OUTPUT_FOLDER, f"{base_name}_data.json")
     if not os.path.exists(json_path):
@@ -247,87 +285,194 @@ def update_label():
         return jsonify({"success": True, "data": data})
     return jsonify({"error": "Detection ID not found"}), 404
 
-@app.route('/api/export_labelstudio/<base_name>')
-def export_labelstudio(base_name):
-    json_path = os.path.join(OUTPUT_FOLDER, f"{base_name}_data.json")
-    if not os.path.exists(json_path):
-        return jsonify({"error": "File not found"}), 404
-        
-    with open(json_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-        
-    w_img = data.get('image_width', 1000)
-    h_img = data.get('image_height', 1000)
-    
-    results = []
-    for d in data['detections']:
-        bx = d['box']
-        # Convert pixel coordinates to Label Studio percentage (0..100)
-        px = (bx['x'] / float(w_img)) * 100.0
-        py = (bx['y'] / float(h_img)) * 100.0
-        pw = (bx['w'] / float(w_img)) * 100.0
-        ph = (bx['h'] / float(h_img)) * 100.0
-        
-        label_val = d['user_verified_text']
-        
-        results.append({
-            "id": f"bbox_{d['id']}",
-            "from_name": "label",
-            "to_name": "image",
-            "type": "rectanglelabels",
-            "value": {
-                "x": round(px, 3),
-                "y": round(py, 3),
-                "width": round(pw, 3),
-                "height": round(ph, 3),
-                "rotation": 0,
-                "rectanglelabels": ["NUMBER" if d['is_numeric'] else "TEXT"]
-            }
-        })
-        results.append({
-            "id": f"bbox_{d['id']}",
-            "from_name": "transcription",
-            "to_name": "image",
-            "type": "textarea",
-            "value": {
-                "x": round(px, 3),
-                "y": round(py, 3),
-                "width": round(pw, 3),
-                "height": round(ph, 3),
-                "rotation": 0,
-                "text": [label_val]
-            }
-        })
-        
-    ls_task = [{
-        "data": {
-            "image": f"/data/upload/{data['filename']}"
-        },
-        "predictions": [{
-            "model_version": "hybrid_chart_ocr_v1",
-            "result": results
-        }]
-    }]
-    
-    export_path = os.path.join(OUTPUT_FOLDER, f"{base_name}_labelstudio_import.json")
-    with open(export_path, 'w', encoding='utf-8') as f:
-        json.dump(ls_task, f, indent=2, ensure_ascii=False)
-        
-    return send_file(export_path, as_attachment=True)
+# --- MinIO Dataset API Endpoints ---
 
-@app.route('/api/upload', methods=['POST'])
-def upload():
+@app.route('/api/minio/upload_zip', methods=['POST'])
+def minio_upload_zip():
     if 'file' not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
+        return jsonify({"error": "No ZIP file uploaded"}), 400
     file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "Empty filename"}), 400
+    if not file.filename.lower().endswith('.zip'):
+        return jsonify({"error": "File must be a .zip archive"}), 400
         
-    path = os.path.join(UPLOAD_FOLDER, file.filename)
-    file.save(path)
+    dataset_name = os.path.splitext(file.filename)[0].replace(' ', '_')
+    zip_bytes = file.read()
     
-    result = process_single_image(path)
-    return jsonify(result)
+    extracted_files = minio_helper.extract_zip_to_minio(zip_bytes, dataset_name)
+    return jsonify({
+        "success": True,
+        "dataset_name": dataset_name,
+        "total_extracted": len(extracted_files),
+        "files": extracted_files
+    })
+
+@app.route('/api/minio/datasets')
+def minio_list_datasets():
+    datasets = minio_helper.list_raw_datasets()
+    return jsonify(datasets)
+
+@app.route('/api/minio/process_dataset', methods=['POST'])
+def minio_process_dataset():
+    body = request.json or {}
+    dataset_name = body.get('dataset_name')
+    if not dataset_name:
+        return jsonify({"error": "No dataset_name provided"}), 400
+        
+    image_keys = minio_helper.list_dataset_images(dataset_name)
+    processed_results = []
+    
+    for key in image_keys:
+        filename = os.path.basename(key)
+        img_bytes = minio_helper.get_object_bytes(key)
+        
+        result = process_chart_bytes(
+            img_bytes, filename, 
+            save_to_minio=True, dataset_name=dataset_name
+        )
+        if result:
+            processed_results.append(result)
+            
+    return jsonify({
+        "success": True,
+        "dataset_name": dataset_name,
+        "total_processed": len(processed_results),
+        "results": processed_results
+    })
+
+@app.route('/api/minio/dataset_details/<dataset_name>')
+def minio_dataset_details(dataset_name):
+    # Fetch all JSON objects from processed_datasets/<dataset_name>/json/
+    s3 = minio_helper.get_s3_client()
+    prefix = f"processed_datasets/{dataset_name}/json/"
+    paginator = s3.get_paginator('list_objects_v2')
+    
+    all_json_data = []
+    for page in paginator.paginate(Bucket=minio_helper.MINIO_BUCKET, Prefix=prefix):
+        for obj in page.get('Contents', []):
+            json_data = minio_helper.read_json_from_minio(obj['Key'])
+            if json_data:
+                json_data['json_key'] = obj['Key']
+                all_json_data.append(json_data)
+                
+    return jsonify({
+        "dataset_name": dataset_name,
+        "charts": all_json_data
+    })
+
+@app.route('/api/minio/update_crop_label', methods=['POST'])
+def minio_update_crop_label():
+    body = request.json or {}
+    json_key = body.get('json_key')
+    detection_id = body.get('detection_id')
+    new_text = body.get('text')
+    new_type = body.get('type')
+    
+    if not json_key:
+        return jsonify({"error": "json_key is required"}), 400
+        
+    data = minio_helper.read_json_from_minio(json_key)
+    if not data:
+        return jsonify({"error": "JSON object not found in MinIO"}), 404
+        
+    updated = False
+    for d in data['detections']:
+        if d['id'] == detection_id:
+            if new_text is not None:
+                d['user_verified_text'] = new_text.strip()
+            if new_type in ["NUMBER", "TEXT"]:
+                d['type'] = new_type
+                d['is_numeric'] = (new_type == "NUMBER")
+            else:
+                d['is_numeric'] = d['user_verified_text'].replace('.', '').replace('-', '').isdigit()
+                d['type'] = "NUMBER" if d['is_numeric'] else "TEXT"
+            updated = True
+            break
+            
+    if updated:
+        data['number_count'] = sum(1 for d in data['detections'] if d["is_numeric"])
+        data['text_count'] = sum(1 for d in data['detections'] if not d["is_numeric"])
+        minio_helper.save_json_to_minio(json_key, data)
+        return jsonify({"success": True, "data": data})
+        
+    return jsonify({"error": "Detection ID not found"}), 404
+
+@app.route('/api/minio/export_training_zip/<dataset_name>')
+def minio_export_training_zip(dataset_name):
+    """
+    Export full dataset training package (ZIP) with Label Studio & YOLO-OBB format.
+    """
+    s3 = minio_helper.get_s3_client()
+    prefix = f"processed_datasets/{dataset_name}/json/"
+    paginator = s3.get_paginator('list_objects_v2')
+    
+    zip_buffer = io.BytesIO()
+    all_labelstudio_tasks = []
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for page in paginator.paginate(Bucket=minio_helper.MINIO_BUCKET, Prefix=prefix):
+            for obj in page.get('Contents', []):
+                data = minio_helper.read_json_from_minio(obj['Key'])
+                if not data:
+                    continue
+                    
+                filename = data['filename']
+                base_name = data['base_name']
+                w_img = data.get('image_width', 1000)
+                h_img = data.get('image_height', 1000)
+                
+                # Add Label Studio task
+                ls_results = []
+                for d in data['detections']:
+                    bx = d['box']
+                    px = (bx['x'] / float(w_img)) * 100.0
+                    py = (bx['y'] / float(h_img)) * 100.0
+                    pw = (bx['w'] / float(w_img)) * 100.0
+                    ph = (bx['h'] / float(h_img)) * 100.0
+                    
+                    ls_results.append({
+                        "id": f"bbox_{d['id']}",
+                        "from_name": "label",
+                        "to_name": "image",
+                        "type": "rectanglelabels",
+                        "value": {
+                            "x": round(px, 3), "y": round(py, 3),
+                            "width": round(pw, 3), "height": round(ph, 3),
+                            "rotation": 0,
+                            "rectanglelabels": ["NUMBER" if d['is_numeric'] else "TEXT"]
+                        }
+                    })
+                    ls_results.append({
+                        "id": f"bbox_{d['id']}",
+                        "from_name": "transcription",
+                        "to_name": "image",
+                        "type": "textarea",
+                        "value": {
+                            "x": round(px, 3), "y": round(py, 3),
+                            "width": round(pw, 3), "height": round(ph, 3),
+                            "rotation": 0,
+                            "text": [d['user_verified_text']]
+                        }
+                    })
+                    
+                all_labelstudio_tasks.append({
+                    "data": {"image": f"/data/upload/{filename}"},
+                    "predictions": [{"model_version": "hybrid_chart_ocr_v1", "result": ls_results}]
+                })
+                
+                # Add raw json per chart
+                zf.writestr(f"annotations/{base_name}_data.json", json.dumps(data, indent=2, ensure_ascii=False))
+                
+        # Write master Label Studio JSON
+        zf.writestr("labelstudio_import_all.json", json.dumps(all_labelstudio_tasks, indent=2, ensure_ascii=False))
+        
+    zip_buffer.seek(0)
+    return Response(
+        zip_buffer.getvalue(),
+        mimetype='application/zip',
+        headers={"Content-Disposition": f"attachment;filename={dataset_name}_verified_training_dataset.zip"}
+    )
+
+# --- Serving Files (Uploads, Outputs, Crops, MinIO) ---
 
 @app.route('/files/uploads/<path:filename>')
 def serve_upload(filename):
@@ -341,6 +486,19 @@ def serve_output(filename):
 def serve_crop(filename):
     return send_from_directory(CROPS_FOLDER, filename)
 
+@app.route('/files/minio/<path:object_key>')
+def serve_minio_object(object_key):
+    """
+    Stream bytes directly from MinIO object key so frontend displays MinIO images.
+    """
+    try:
+        data = minio_helper.get_object_bytes(object_key)
+        ext = os.path.splitext(object_key)[1].lower()
+        mimetype = 'image/png' if ext == '.png' else ('image/jpeg' if ext in ['.jpg', '.jpeg'] else 'application/octet-stream')
+        return Response(data, mimetype=mimetype)
+    except Exception as e:
+        return jsonify({"error": f"MinIO object not found: {str(e)}"}), 404
+
 if __name__ == '__main__':
-    print("Starting Chart OCR Web Server on http://127.0.0.1:5050...")
+    print("Starting Chart OCR & MinIO Dataset Web Server on http://127.0.0.1:5050...")
     app.run(host='0.0.0.0', port=5050, debug=False)
