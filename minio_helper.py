@@ -11,25 +11,22 @@ MINIO_ACCESS_KEY = os.environ.get('MINIO_ACCESS_KEY', 'minioadmin')
 MINIO_SECRET_KEY = os.environ.get('MINIO_SECRET_KEY', '1MP6rLEyoGKVAoUaNJoMDW2F')
 MINIO_BUCKET = os.environ.get('MINIO_BUCKET', 'chart-ocr-datasets')
 
-_s3_client = None
-
 def get_s3_client():
-    global _s3_client
-    if _s3_client is None:
-        _s3_client = boto3.client(
-            's3',
-            endpoint_url=MINIO_ENDPOINT,
-            aws_access_key_id=MINIO_ACCESS_KEY,
-            aws_secret_access_key=MINIO_SECRET_KEY,
-            config=Config(signature_version='s3v4'),
-            region_name='us-east-1'
-        )
-        ensure_bucket_exists()
-    return _s3_client
+    return boto3.client(
+        's3',
+        endpoint_url=MINIO_ENDPOINT,
+        aws_access_key_id=MINIO_ACCESS_KEY,
+        aws_secret_access_key=MINIO_SECRET_KEY,
+        config=Config(
+            signature_version='s3v4',
+            s3={'addressing_style': 'path'}
+        ),
+        region_name='us-east-1'
+    )
 
 def ensure_bucket_exists():
-    s3 = _s3_client
     try:
+        s3 = get_s3_client()
         buckets = [b['Name'] for b in s3.list_buckets().get('Buckets', [])]
         if MINIO_BUCKET not in buckets:
             s3.create_bucket(Bucket=MINIO_BUCKET)
@@ -37,6 +34,7 @@ def ensure_bucket_exists():
         print(f"MinIO bucket check warning: {e}")
 
 def upload_file_bytes(object_key, file_bytes, content_type='application/octet-stream'):
+    ensure_bucket_exists()
     s3 = get_s3_client()
     s3.put_object(
         Bucket=MINIO_BUCKET,
@@ -47,10 +45,7 @@ def upload_file_bytes(object_key, file_bytes, content_type='application/octet-st
     return f"{MINIO_ENDPOINT}/{MINIO_BUCKET}/{object_key}"
 
 def extract_zip_file_to_minio(zip_source, dataset_prefix):
-    """
-    Extract a ZIP archive (file path or file object) into MinIO under raw_uploads/<dataset_prefix>/
-    Streams file contents to prevent RAM spikes on 250MB+ datasets.
-    """
+    ensure_bucket_exists()
     s3 = get_s3_client()
     extracted_files = []
     
@@ -86,6 +81,7 @@ def extract_zip_file_to_minio(zip_source, dataset_prefix):
     return extracted_files
 
 def list_raw_datasets():
+    ensure_bucket_exists()
     s3 = get_s3_client()
     paginator = s3.get_paginator('list_objects_v2')
     datasets = set()
@@ -100,6 +96,7 @@ def list_raw_datasets():
     return sorted(list(datasets))
 
 def list_dataset_images(dataset_name):
+    ensure_bucket_exists()
     s3 = get_s3_client()
     paginator = s3.get_paginator('list_objects_v2')
     image_keys = []
@@ -120,6 +117,7 @@ def get_object_bytes(object_key):
     return response['Body'].read()
 
 def save_json_to_minio(object_key, data):
+    ensure_bucket_exists()
     s3 = get_s3_client()
     json_bytes = json.dumps(data, indent=2, ensure_ascii=False).encode('utf-8')
     s3.put_object(
