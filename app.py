@@ -1,17 +1,17 @@
 import os
 import io
+import zipfile
 import json
 import glob
 import cv2
 import numpy as np
-import zipfile
-from flask import Flask, render_template, request, jsonify, send_from_directory, send_file, Response, make_response
+from flask import Flask, render_template, request, jsonify, send_from_directory, Response, make_response
 import easyocr
 
 import minio_helper
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
-app.config['MAX_CONTENT_LENGTH'] = 1000 * 1024 * 1024  # Support up to 1GB dataset ZIP uploads
+app.config['MAX_CONTENT_LENGTH'] = 1000 * 1024 * 1024  # 1GB limit
 
 UPLOAD_FOLDER = os.path.join(app.root_path, 'uploads')
 OUTPUT_FOLDER = os.path.join(app.root_path, 'extracted_output')
@@ -317,7 +317,6 @@ def minio_upload_zip():
         
     dataset_name = os.path.splitext(file.filename)[0].replace(' ', '_')
     
-    # Save to temporary disk file to stream read without RAM spikes
     temp_path = os.path.join(UPLOAD_FOLDER, f"temp_{dataset_name}.zip")
     file.save(temp_path)
     
@@ -339,33 +338,55 @@ def minio_list_datasets():
     datasets = minio_helper.list_raw_datasets()
     return jsonify(datasets)
 
-@app.route('/api/minio/process_dataset', methods=['POST'])
-def minio_process_dataset():
+@app.route('/api/minio/process_dataset_stream', methods=['POST'])
+def minio_process_dataset_stream():
+    """
+    Server-Sent Events (SSE) streaming batch processor.
+    Streams real-time progress updates for every single chart image processed.
+    """
     body = request.json or {}
     dataset_name = body.get('dataset_name')
     if not dataset_name:
         return jsonify({"error": "No dataset_name provided"}), 400
         
     image_keys = minio_helper.list_dataset_images(dataset_name)
-    processed_results = []
-    
-    for key in image_keys:
-        filename = os.path.basename(key)
-        img_bytes = minio_helper.get_object_bytes(key)
+    total_images = len(image_keys)
+
+    def generate_events():
+        yield f"data: {json.dumps({'type': 'start', 'total': total_images, 'dataset_name': dataset_name})}\n\n"
         
-        result = process_chart_bytes(
-            img_bytes, filename, 
-            save_to_minio=True, dataset_name=dataset_name
-        )
-        if result:
-            processed_results.append(result)
-            
-    return jsonify({
-        "success": True,
-        "dataset_name": dataset_name,
-        "total_processed": len(processed_results),
-        "results": processed_results
-    })
+        for idx, key in enumerate(image_keys, 1):
+            filename = os.path.basename(key)
+            try:
+                img_bytes = minio_helper.get_object_bytes(key)
+                result = process_chart_bytes(
+                    img_bytes, filename, 
+                    save_to_minio=True, dataset_name=dataset_name
+                )
+                
+                event_payload = {
+                    "type": "progress",
+                    "current": idx,
+                    "total": total_images,
+                    "filename": filename,
+                    "numbers_found": result["number_count"] if result else 0,
+                    "texts_found": result["text_count"] if result else 0,
+                    "percentage": round((idx / float(total_images)) * 100, 1)
+                }
+                yield f"data: {json.dumps(event_payload)}\n\n"
+            except Exception as e:
+                error_payload = {
+                    "type": "error_item",
+                    "current": idx,
+                    "total": total_images,
+                    "filename": filename,
+                    "error": str(e)
+                }
+                yield f"data: {json.dumps(error_payload)}\n\n"
+                
+        yield f"data: {json.dumps({'type': 'complete', 'total': total_images, 'dataset_name': dataset_name})}\n\n"
+
+    return Response(generate_events(), mimetype='text/event-stream')
 
 @app.route('/api/minio/dataset_details/<dataset_name>')
 def minio_dataset_details(dataset_name):

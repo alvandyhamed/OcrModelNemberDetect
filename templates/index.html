@@ -3,199 +3,178 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chart OCR & MinIO Dataset Studio</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <title>استودیوی استخراج و لیبل‌گذاری نمودارها | Chart OCR Studio</title>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-dark: #090d16;
-            --panel-bg: rgba(21, 32, 54, 0.85);
-            --border-color: rgba(255, 255, 255, 0.12);
+            --card-bg: #111827;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
             --accent-green: #10b981;
-            --accent-green-glow: rgba(16, 185, 129, 0.4);
+            --accent-green-glow: rgba(16, 185, 129, 0.3);
             --accent-cyan: #06b6d4;
-            --accent-cyan-glow: rgba(6, 182, 212, 0.4);
             --accent-purple: #8b5cf6;
-            --accent-pink: #ec4899;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
+            --accent-purple-glow: rgba(139, 92, 246, 0.4);
+            --accent-yellow: #f59e0b;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
-
         body {
             font-family: 'Vazirmatn', sans-serif;
             background-color: var(--bg-dark);
             color: var(--text-main);
-            min-height: 100vh;
-            display: flex; flex-direction: column;
-            overflow-x: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
 
         header {
-            background: rgba(15, 23, 42, 0.95);
-            backdrop-filter: blur(16px);
+            background: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border-color);
-            padding: 1rem 2rem;
-            display: flex; justify-content: space-between; align-items: center;
-            position: sticky; top: 0; z-index: 100;
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
         }
 
-        .brand { display: flex; align-items: center; gap: 0.85rem; }
-
+        .brand { display: flex; align-items: center; gap: 0.75rem; }
         .brand-icon {
-            width: 42px; height: 42px;
-            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
-            border-radius: 12px;
-            display: flex; align-items: center; justify-content: center;
-            font-weight: 700; font-size: 1.4rem;
-            box-shadow: 0 0 20px var(--accent-cyan-glow);
-        }
-
-        .brand-title {
-            font-size: 1.35rem; font-weight: 700;
-            background: linear-gradient(to left, #ffffff, #cbd5e1);
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            font-weight: 800;
         }
+        .brand-title { font-size: 1.1rem; font-weight: 700; color: #fff; }
 
-        .header-actions { display: flex; gap: 1rem; align-items: center; }
-
+        .header-actions { display: flex; gap: 0.75rem; align-items: center; }
         .btn-action {
-            border: none; padding: 0.65rem 1.3rem; border-radius: 12px;
-            font-weight: 700; font-size: 0.9rem; font-family: 'Vazirmatn', sans-serif;
-            cursor: pointer; display: flex; align-items: center; gap: 0.5rem;
-            transition: all 0.25 ease; text-decoration: none;
-        }
-
-        .btn-zip {
-            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
-            color: #ffffff; box-shadow: 0 0 15px rgba(236, 72, 153, 0.3);
-        }
-        .btn-zip:hover { transform: translateY(-2px); box-shadow: 0 0 25px rgba(236, 72, 153, 0.5); }
-
-        .btn-img {
-            background: linear-gradient(135deg, var(--accent-cyan), #0284c7);
-            color: #ffffff; box-shadow: 0 0 15px var(--accent-cyan-glow);
-        }
-        .btn-img:hover { transform: translateY(-2px); box-shadow: 0 0 25px var(--accent-cyan-glow); }
-
-        .btn-export {
-            background: linear-gradient(135deg, var(--accent-green), #059669);
-            color: #ffffff; box-shadow: 0 0 15px var(--accent-green-glow);
-        }
-        .btn-export:hover { transform: translateY(-2px); box-shadow: 0 0 25px var(--accent-green-glow); }
-
-        .container {
-            display: grid; grid-template-columns: 360px 1fr;
-            gap: 1.5rem; padding: 1.5rem 2rem; flex: 1;
-            max-width: 1920px; margin: 0 auto; width: 100%;
-        }
-
-        .sidebar { display: flex; flex-direction: column; gap: 1.25rem; }
-
-        .card {
-            background: var(--panel-bg); backdrop-filter: blur(12px);
-            border: 1px solid var(--border-color); border-radius: 18px;
-            padding: 1.25rem; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }
-
-        .card-title {
-            font-size: 0.88rem; font-weight: 700; text-transform: uppercase;
-            letter-spacing: 0.03em; color: var(--text-muted); margin-bottom: 0.85rem;
             display: flex; align-items: center; gap: 0.5rem;
-        }
-
-        .big-upload-zone {
-            border: 2px dashed var(--accent-purple); border-radius: 14px;
-            padding: 1.5rem 1rem; text-align: center; cursor: pointer;
-            background: linear-gradient(180deg, rgba(139, 92, 246, 0.1), rgba(15, 23, 42, 0.4));
-            transition: all 0.25s ease; position: relative; overflow: hidden;
-        }
-        .big-upload-zone:hover {
-            border-color: var(--accent-pink); background: rgba(236, 72, 153, 0.15);
-            transform: scale(1.01);
-        }
-        .big-upload-zone .icon { font-size: 2.2rem; margin-bottom: 0.5rem; }
-        .big-upload-zone h4 { font-size: 1rem; font-weight: 700; color: #fff; }
-        .big-upload-zone p { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.25rem; }
-
-        .sample-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 220px; overflow-y: auto; }
-
-        .sample-btn {
-            background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);
-            color: var(--text-main); padding: 0.75rem 0.9rem; border-radius: 10px;
-            cursor: pointer; text-align: right; font-size: 0.85rem;
-            font-family: 'Vazirmatn', sans-serif; transition: all 0.2s ease;
-            display: flex; align-items: center; justify-content: space-between;
-        }
-        .sample-btn:hover { background: rgba(255, 255, 255, 0.1); border-color: var(--accent-cyan); }
-        .sample-btn.active {
-            background: linear-gradient(135deg, rgba(6, 182, 212, 0.25), rgba(139, 92, 246, 0.25));
-            border-color: var(--accent-cyan); box-shadow: 0 0 15px var(--accent-cyan-glow);
-        }
-
-        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
-        .stat-box { background: rgba(9, 13, 22, 0.7); border: 1px solid var(--border-color); border-radius: 12px; padding: 0.85rem; text-align: center; }
-        .stat-value { font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; font-family: 'JetBrains Mono', monospace; }
-        .stat-value.green { color: var(--accent-green); }
-        .stat-value.cyan { color: var(--accent-cyan); }
-        .stat-label { font-size: 0.72rem; color: var(--text-muted); }
-
-        .workspace { display: flex; flex-direction: column; gap: 1rem; }
-
-        .tab-bar { display: flex; gap: 0.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; }
-        .tab-btn {
-            background: transparent; border: none; color: var(--text-muted);
-            padding: 0.65rem 1.2rem; border-radius: 10px; cursor: pointer;
-            font-weight: 600; font-size: 0.9rem; font-family: 'Vazirmatn', sans-serif; transition: all 0.2s ease;
-        }
-        .tab-btn:hover { color: var(--text-main); background: rgba(255, 255, 255, 0.06); }
-        .tab-btn.active { color: var(--text-main); background: rgba(255, 255, 255, 0.12); font-weight: 700; }
-
-        .viewer-card {
-            background: var(--panel-bg); backdrop-filter: blur(12px);
-            border: 1px solid var(--border-color); border-radius: 18px;
-            padding: 1.25rem; display: flex; flex-direction: column; gap: 1.25rem;
-        }
-
-        .image-viewport {
-            width: 100%; height: 520px; background: #020617; border-radius: 14px;
-            overflow: auto; display: flex; align-items: center; justify-content: center;
-            position: relative; border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .image-viewport img { max-width: 100%; max-height: 100%; object-fit: contain; }
-
-        .crops-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-            gap: 1rem; max-height: 560px; overflow-y: auto; padding: 0.5rem;
-        }
-
-        .crop-card {
-            background: rgba(9, 13, 22, 0.9); border: 1px solid var(--border-color);
-            border-radius: 14px; padding: 0.9rem; display: flex; flex-direction: column;
-            gap: 0.75rem; transition: all 0.2s ease; position: relative;
-        }
-        .crop-card:hover { border-color: var(--accent-cyan); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5); }
-
-        .crop-header { display: flex; justify-content: space-between; align-items: center; }
-        .crop-id { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); }
-
-        .type-select {
-            background: rgba(15, 23, 42, 0.95); border: 1px solid var(--border-color);
-            color: var(--text-main); padding: 0.3rem 0.5rem; border-radius: 8px;
-            font-size: 0.75rem; font-weight: 700; cursor: pointer; outline: none;
+            padding: 0.5rem 1rem; border-radius: 10px; font-weight: 600;
+            font-size: 0.85rem; border: none; cursor: pointer;
+            transition: all 0.2s ease; text-decoration: none; color: #fff;
             font-family: 'Vazirmatn', sans-serif;
         }
-        .type-select.NUMBER { color: var(--accent-green); border-color: var(--accent-green); }
-        .type-select.TEXT { color: var(--accent-cyan); border-color: var(--accent-cyan); }
+        .btn-zip { background: linear-gradient(135deg, var(--accent-purple), #6d28d9); box-shadow: 0 0 15px var(--accent-purple-glow); }
+        .btn-zip:hover { transform: translateY(-2px); filter: brightness(1.1); }
+        .btn-img { background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border-color); }
+        .btn-img:hover { background: rgba(255, 255, 255, 0.15); }
+        .btn-export { background: linear-gradient(135deg, var(--accent-green), #047857); box-shadow: 0 0 15px var(--accent-green-glow); }
+        .btn-export:hover { transform: translateY(-2px); filter: brightness(1.1); }
 
-        .crop-preview-box {
-            height: 80px; background: #000; border-radius: 10px; display: flex;
-            align-items: center; justify-content: center; overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.08); padding: 4px;
+        .container { display: flex; flex: 1; overflow: hidden; }
+
+        .sidebar {
+            width: 320px;
+            background: var(--card-bg);
+            border-left: 1px solid var(--border-color);
+            display: flex; flex-direction: column;
+            padding: 1rem; gap: 1rem; overflow-y: auto;
         }
-        .crop-preview-box img { max-width: 100%; max-height: 100%; object-fit: contain; filter: contrast(1.1); }
+
+        .main-panel {
+            flex: 1; display: flex; flex-direction: column;
+            background: rgba(0, 0, 0, 0.2); overflow: hidden;
+            position: relative;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 12px; padding: 1rem;
+            display: flex; flex-direction: column; gap: 0.75rem;
+        }
+        .card-title {
+            font-size: 0.85rem; font-weight: 700; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.05em;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+
+        .dropzone {
+            border: 2px dashed rgba(255, 255, 255, 0.15);
+            border-radius: 10px; padding: 1.5rem 1rem; text-align: center;
+            cursor: pointer; transition: all 0.2s ease;
+            background: rgba(255, 255, 255, 0.01);
+        }
+        .dropzone:hover, .dropzone.dragover {
+            border-color: var(--accent-purple);
+            background: rgba(139, 92, 246, 0.05);
+        }
+        .dropzone-text { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem; }
+
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+        .stat-box {
+            background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border-color);
+            border-radius: 8px; padding: 0.75rem; text-align: center;
+        }
+        .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 700; color: var(--accent-cyan); }
+        .stat-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+        .sample-list { display: flex; flex-direction: column; gap: 0.4rem; }
+        .sample-btn {
+            background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color);
+            color: var(--text-main); padding: 0.5rem 0.75rem; border-radius: 8px;
+            font-size: 0.8rem; text-align: right; cursor: pointer; transition: all 0.2s ease;
+            display: flex; justify-content: space-between; align-items: center;
+            font-family: 'JetBrains Mono', monospace; dir: ltr;
+        }
+        .sample-btn:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.2); }
+
+        .toolbar {
+            background: var(--card-bg); border-bottom: 1px solid var(--border-color);
+            padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center;
+        }
+        .tabs { display: flex; gap: 0.5rem; }
+        .tab-btn {
+            background: rgba(255, 255, 255, 0.05); border: 1px solid transparent;
+            color: var(--text-muted); padding: 0.4rem 0.85rem; border-radius: 8px;
+            font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease;
+            font-family: 'Vazirmatn', sans-serif;
+        }
+        .tab-btn.active {
+            background: rgba(139, 92, 246, 0.15); border-color: var(--accent-purple);
+            color: #fff; box-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
+        }
+
+        .viewport {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            padding: 1.5rem; overflow: auto; position: relative;
+        }
+        .main-img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+
+        .crops-container { flex: 1; padding: 1.5rem; overflow-y: auto; display: none; }
+        .crops-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem;
+        }
+        .crop-card {
+            background: var(--card-bg); border: 1px solid var(--border-color);
+            border-radius: 10px; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.65rem;
+            position: relative; transition: all 0.2s ease;
+        }
+        .crop-card:hover { border-color: rgba(255, 255, 255, 0.2); transform: translateY(-2px); }
+        .crop-card.is-number { border-top: 3px solid var(--accent-green); }
+        .crop-card.is-text { border-top: 3px solid var(--accent-yellow); }
+
+        .crop-img-wrapper {
+            background: #fff; border-radius: 6px; padding: 0.4rem; display: flex;
+            align-items: center; justify-content: center; min-height: 50px; max-height: 75px;
+        }
+        .crop-img-wrapper img { max-width: 100%; max-height: 65px; object-fit: contain; }
+
+        .crop-info { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-muted); }
+        .crop-id { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--text-main); }
+        .crop-conf { font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan); }
+
+        .type-select {
+            background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.18);
+            color: var(--text-main); padding: 0.4rem 0.6rem; border-radius: 6px;
+            font-family: 'Vazirmatn', sans-serif; font-size: 0.8rem; font-weight: 600;
+            outline: none; transition: all 0.2s ease; margin-bottom: 0.25rem;
+        }
 
         .label-input-group { display: flex; flex-direction: column; gap: 0.25rem; }
         .label-input-label { font-size: 0.7rem; color: var(--text-muted); }
@@ -258,107 +237,154 @@
         <div class="sidebar">
             <!-- Upload Card -->
             <div class="card">
-                <div class="card-title">📤 آپلود فایل و دیتاست</div>
-                <div class="big-upload-zone" onclick="triggerZipUpload()">
-                    <div class="icon">📦</div>
-                    <h4>آپلود ZIP دیتاست (MinIO)</h4>
-                    <p>فایل زیپ را اینجا بکشید یا رها کنید</p>
+                <div class="card-title">آپلود دیتاست ZIP یا عکس</div>
+                <div class="dropzone" id="dropzone" onclick="triggerZipUpload()">
+                    <div style="font-size: 2rem;">📁</div>
+                    <div class="dropzone-text">فایل ZIP یا عکس را اینجا رها کنید</div>
                 </div>
             </div>
 
-            <!-- MinIO Datasets List -->
+            <!-- Stats Card -->
             <div class="card">
-                <div class="card-title">🗄️ پوشه‌های دیتاست در MinIO</div>
-                <div class="sample-list" id="minioDatasetList"></div>
-            </div>
-
-            <!-- Local Samples List -->
-            <div class="card">
-                <div class="card-title">📁 نمونه‌های لوکال</div>
-                <div class="sample-list" id="sampleList"></div>
-            </div>
-
-            <!-- Stats -->
-            <div class="card">
-                <div class="card-title">📊 آمار اعدادی و متنی</div>
+                <div class="card-title">آمار استخراج نمودار فعلی</div>
                 <div class="stats-grid">
                     <div class="stat-box">
-                        <div class="stat-label">تعداد اعداد</div>
-                        <div class="stat-value green" id="statNumbers">0</div>
+                        <div class="stat-value" id="statNumbers">0</div>
+                        <div class="stat-label">اعداد شناسایی‌شده</div>
                     </div>
                     <div class="stat-box">
-                        <div class="stat-label">تعداد متون</div>
-                        <div class="stat-value cyan" id="statTexts">0</div>
+                        <div class="stat-value" id="statTexts" style="color: var(--accent-yellow);">0</div>
+                        <div class="stat-label">متن‌های راهنما</div>
                     </div>
+                </div>
+            </div>
+
+            <!-- MinIO Dataset List Card -->
+            <div class="card">
+                <div class="card-title">🗄️ پوشه‌های دیتاست در MinIO</div>
+                <div class="sample-list" id="minioDatasetList">
+                    <div style="color: var(--text-muted); font-size: 0.8rem;">در حال بارگذاری پوشه‌ها...</div>
+                </div>
+            </div>
+
+            <!-- Local Samples Card -->
+            <div class="card">
+                <div class="card-title">نمودارهای نمونه لوکال</div>
+                <div class="sample-list" id="sampleList">
+                    <!-- Dynamic -->
                 </div>
             </div>
         </div>
 
-        <!-- Workspace -->
-        <div class="workspace">
-            <div class="viewer-card">
-                <!-- Dataset Chart Selector -->
-                <div id="datasetChartBar" style="display:none; flex-direction:column; gap:0.5rem;">
-                    <div class="card-title" style="margin:0;">🖼️ تصاویر پردازش‌شده دیتاست</div>
-                    <select class="chart-selector" id="datasetChartSelect" onchange="onDatasetChartChange(this.value)"></select>
+        <!-- Main Workspace Panel -->
+        <div class="main-panel">
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="switchView('crops')">🔍 کراپ‌های تفکیک‌شده</button>
+                    <button class="tab-btn" onclick="switchView('annotated')">🏷️ تصویر با باکس (Bounding Box)</button>
+                    <button class="tab-btn" onclick="switchView('original')">🖼️ تصویر اصلی</button>
                 </div>
+            </div>
 
-                <div class="tab-bar">
-                    <button class="tab-btn active" onclick="switchView('crops')">✂️ گالری تعاملی کراپ‌ها</button>
-                    <button class="tab-btn" onclick="switchView('annotated')">🎯 نمودار کادربندی‌شده</button>
-                    <button class="tab-btn" onclick="switchView('original')">🖼️ نمودار اصلی</button>
-                </div>
+            <!-- Dataset Chart Selector Bar -->
+            <div id="datasetChartBar" style="display:none; padding: 0.75rem 1.5rem; background: rgba(0,0,0,0.4); border-bottom: 1px solid var(--border-color); align-items:center; gap: 1rem;">
+                <label style="font-size:0.85rem; font-weight:700; color:var(--accent-cyan); white-space:nowrap;">انتخاب نمودار در دیتاست:</label>
+                <select id="datasetChartSelect" class="chart-selector" onchange="onDatasetChartChange(this.value)"></select>
+            </div>
 
-                <div class="image-viewport" id="viewport" style="display:none;">
-                    <div class="loading-overlay" id="loadingOverlay" style="display:none;">
-                        <div class="spinner"></div>
-                        <div style="font-weight: 600; font-size:1rem;" id="loadingText">در حال استخراج و پردازش OCR...</div>
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+                <div class="spinner"></div>
+                <div style="font-weight: 600;" id="loadingText">در حال پردازش و استخراج OCR...</div>
+            </div>
+
+            <!-- Viewport for Full Image -->
+            <div class="viewport" id="viewport" style="display: none;">
+                <img id="mainImage" class="main-img" src="" alt="Chart Image">
+            </div>
+
+            <!-- Crops Grid Container -->
+            <div class="crops-container" id="cropsContainer" style="display: block;">
+                <div class="crops-grid" id="cropsGrid">
+                    <div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 3rem;">
+                        لطفاً یک تصویر آپلود کنید یا یک دیتاست MinIO را انتخاب نمایید.
                     </div>
-                    <img id="mainImage" src="" alt="Chart View">
                 </div>
+            </div>
+        </div>
+    </div>
 
-                <div id="cropsContainer">
-                    <div class="card-title" style="margin-bottom: 0.85rem;">
-                        ✏️ برش اعداد و حروف (جهت ویرایش یا تغییر نوع NUMBER/TEXT کلیک کنید)
-                    </div>
-                    <div class="crops-grid" id="cropsGrid"></div>
+    <!-- Real-Time Live Batch Processing Progress Modal -->
+    <div id="progressModal" style="display:none; position:fixed; inset:0; background:rgba(9, 13, 22, 0.92); backdrop-filter:blur(10px); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:var(--card-bg); border:1px solid var(--accent-purple); border-radius:18px; padding:2rem; width:90%; max-width:650px; box-shadow:0 0 40px rgba(139, 92, 246, 0.3); display:flex; flex-direction:column; gap:1.25rem;">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+                <div style="font-size:1.15rem; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:0.5rem;">
+                    <div class="spinner" style="width:24px; height:24px; border-width:3px;"></div>
+                    <span>⚡ پردازش زنده دیتاست MinIO...</span>
                 </div>
+                <div id="progressPercentText" style="font-family:'JetBrains Mono'; font-size:1.1rem; font-weight:800; color:var(--accent-purple-glow);">0%</div>
+            </div>
+
+            <!-- Progress Bar Container -->
+            <div style="background:rgba(255,255,255,0.08); border-radius:12px; height:20px; overflow:hidden; border:1px solid rgba(255,255,255,0.1); position:relative;">
+                <div id="progressBarFill" style="background:linear-gradient(90deg, var(--accent-purple), var(--accent-cyan)); height:100%; width:0%; transition:width 0.3s ease; box-shadow:0 0 15px var(--accent-purple-glow);"></div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-muted);">
+                <div>فایل در حال پردازش: <span id="progressCurrentFile" style="color:var(--accent-cyan); font-weight:700; font-family:'JetBrains Mono';">-</span></div>
+                <div>پیشرفت: <span id="progressCountText" style="color:var(--text-main); font-weight:700;">0 / 0</span></div>
+            </div>
+
+            <!-- Live Log Terminal -->
+            <div id="progressLogTerminal" style="background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:0.85rem; height:180px; overflow-y:auto; font-family:'JetBrains Mono', monospace; font-size:0.8rem; color:#a7f3d0; display:flex; flex-direction:column; gap:0.35rem; direction:ltr; text-align:left;">
+                <div>> Stream connected. Initiating OCR batch execution...</div>
             </div>
         </div>
     </div>
 
     <script>
         let currentData = null;
+        let currentView = 'crops';
         let currentDatasetName = null;
         let datasetCharts = [];
-        let currentView = 'crops';
 
         document.addEventListener('DOMContentLoaded', () => {
-            loadSamples();
             loadMinIODatasets();
+            loadLocalSamples();
 
-            const zipFileInput = document.getElementById('zipFileInput');
-            const imageFileInput = document.getElementById('imageFileInput');
+            const dropzone = document.getElementById('dropzone');
+            const zipInput = document.getElementById('zipFileInput');
+            const imgInput = document.getElementById('imageFileInput');
 
-            zipFileInput.addEventListener('change', (e) => {
+            zipInput.addEventListener('change', (e) => {
                 if (e.target.files.length > 0) uploadZipToMinIO(e.target.files[0]);
             });
 
-            imageFileInput.addEventListener('change', (e) => {
+            imgInput.addEventListener('change', (e) => {
                 if (e.target.files.length > 0) uploadSingleImage(e.target.files[0]);
             });
 
-            // Drag and drop anywhere on page
-            window.addEventListener('dragover', (e) => e.preventDefault());
-            window.addEventListener('drop', (e) => {
-                e.preventDefault();
-                if (e.dataTransfer.files.length > 0) {
-                    const file = e.dataTransfer.files[0];
-                    if (file.name.toLowerCase().endsWith('.zip')) {
-                        uploadZipToMinIO(file);
-                    } else if (file.type.startsWith('image/')) {
-                        uploadSingleImage(file);
-                    }
+            // Drag and drop setup
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                document.body.addEventListener(eventName, preventDefaults, false);
+            });
+            function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropzone.classList.add('dragover');
+            });
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropzone.classList.remove('dragover');
+            });
+
+            document.body.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                if (files.length > 0) {
+                    const file = files[0];
+                    if (file.name.toLowerCase().endswith('.zip')) uploadZipToMinIO(file);
+                    else uploadSingleImage(file);
                 }
             });
         });
@@ -366,35 +392,22 @@
         function triggerZipUpload() { document.getElementById('zipFileInput').click(); }
         function triggerImageUpload() { document.getElementById('imageFileInput').click(); }
 
-        async function loadSamples() {
-            const res = await fetch('/api/samples');
-            const samples = await res.json();
-            const listEl = document.getElementById('sampleList');
-            listEl.innerHTML = '';
-
-            samples.forEach((sample) => {
-                const btn = document.createElement('button');
-                btn.className = 'sample-btn';
-                btn.innerHTML = `<span>📄 ${sample}</span> <span>➔</span>`;
-                btn.onclick = () => {
-                    document.querySelectorAll('.sample-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    currentDatasetName = null;
-                    document.getElementById('datasetChartBar').style.display = 'none';
-                    processSample(sample);
-                };
-                listEl.appendChild(btn);
-            });
+        async function loadMinIODatasets() {
+            try {
+                const res = await fetch('/api/minio/datasets');
+                const datasets = await res.json();
+                renderMinIODatasets(datasets);
+            } catch(e) {
+                console.error("Error loading MinIO datasets", e);
+            }
         }
 
-        async function loadMinIODatasets() {
-            const res = await fetch('/api/minio/datasets');
-            const datasets = await res.json();
+        function renderMinIODatasets(datasets) {
             const listEl = document.getElementById('minioDatasetList');
             listEl.innerHTML = '';
 
             if (datasets.length === 0) {
-                listEl.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); text-align:center; padding:0.5rem;">هیچ دیتاست زیپی هنوز آپلود نشده است</div>';
+                listEl.innerHTML = '<div style="color: var(--text-muted); font-size: 0.8rem;">هیچ دیتاستی هنوز آپلود نشده است.</div>';
                 return;
             }
 
@@ -463,22 +476,84 @@
         }
 
         async function processDatasetMinIO(datasetName) {
-            showLoading(true, `در حال پردازش تمام تصاویر نمودار در دیتاست '${datasetName}' با OCR...`);
+            const modal = document.getElementById('progressModal');
+            const barFill = document.getElementById('progressBarFill');
+            const percentText = document.getElementById('progressPercentText');
+            const fileText = document.getElementById('progressCurrentFile');
+            const countText = document.getElementById('progressCountText');
+            const terminal = document.getElementById('progressLogTerminal');
+
+            modal.style.display = 'flex';
+            barFill.style.width = '0%';
+            percentText.innerText = '0%';
+            fileText.innerText = 'در حال برقراری ارتباط با سرور...';
+            countText.innerText = '0 / 0';
+            terminal.innerHTML = '<div>> Connecting to real-time batch SSE event stream...</div>';
+
             try {
-                const res = await fetch('/api/minio/process_dataset', {
+                const response = await fetch('/api/minio/process_dataset_stream', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({dataset_name: datasetName})
                 });
-                const data = await res.json();
-                if (data.success) {
-                    currentDatasetName = datasetName;
-                    loadDatasetDetails(datasetName);
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const chunks = buffer.split('\n\n');
+                    buffer = chunks.pop(); // save incomplete line chunk
+
+                    for (const chunk of chunks) {
+                        const line = chunk.trim();
+                        if (!line.startsWith('data: ')) continue;
+                        const jsonStr = line.replace(/^data:\s*/, '').trim();
+                        if (!jsonStr) continue;
+
+                        try {
+                            const evt = JSON.parse(jsonStr);
+                            if (evt.type === 'start') {
+                                countText.innerText = `0 / ${evt.total}`;
+                                terminal.innerHTML += `<div>> Target dataset '${evt.dataset_name}' loaded (${evt.total} chart images total).</div>`;
+                            } else if (evt.type === 'progress') {
+                                barFill.style.width = `${evt.percentage}%`;
+                                percentText.innerText = `${evt.percentage}%`;
+                                fileText.innerText = evt.filename;
+                                countText.innerText = `${evt.current} / ${evt.total}`;
+
+                                const logLine = document.createElement('div');
+                                logLine.innerText = `[${evt.current}/${evt.total}] ${evt.filename} -> ${evt.numbers_found} numbers, ${evt.texts_found} text labels`;
+                                terminal.appendChild(logLine);
+                                terminal.scrollTop = terminal.scrollHeight;
+                            } else if (evt.type === 'error_item') {
+                                const errLine = document.createElement('div');
+                                errLine.style.color = '#f87171';
+                                errLine.innerText = `[${evt.current}/${evt.total}] ERROR ${evt.filename}: ${evt.error}`;
+                                terminal.appendChild(errLine);
+                                terminal.scrollTop = terminal.scrollHeight;
+                            } else if (evt.type === 'complete') {
+                                barFill.style.width = '100%';
+                                percentText.innerText = '100%';
+                                terminal.innerHTML += `<div style="color:#6ee7b7; font-weight:bold;">> Batch execution completed successfully! Loading charts...</div>`;
+                                setTimeout(() => {
+                                    modal.style.display = 'none';
+                                    currentDatasetName = datasetName;
+                                    loadDatasetDetails(datasetName);
+                                }, 1200);
+                            }
+                        } catch(err) {
+                            console.error('Error parsing SSE event chunk', err);
+                        }
+                    }
                 }
             } catch(e) {
-                alert('خطا در پردازش دسته‌ای دیتاست MinIO');
-            } finally {
-                showLoading(false);
+                alert('خطا در پردازش دسته‌ای: ' + e.message);
+                modal.style.display = 'none';
             }
         }
 
@@ -515,6 +590,29 @@
             renderData();
         }
 
+        async function loadLocalSamples() {
+            try {
+                const res = await fetch('/api/samples');
+                const samples = await res.json();
+                const sampleList = document.getElementById('sampleList');
+                sampleList.innerHTML = '';
+
+                samples.forEach(s => {
+                    const btn = document.createElement('button');
+                    btn.className = 'sample-btn';
+                    btn.innerText = `📄 ${s}`;
+                    btn.onclick = () => {
+                        currentDatasetName = null;
+                        document.getElementById('datasetChartBar').style.display = 'none';
+                        processSample(s);
+                    };
+                    sampleList.appendChild(btn);
+                });
+            } catch(e) {
+                console.error("Error loading local samples", e);
+            }
+        }
+
         async function processSample(filename) {
             showLoading(true, "در حال پردازش نمونه نمودار...");
             try {
@@ -545,58 +643,84 @@
 
             currentData.detections.forEach(d => {
                 const card = document.createElement('div');
-                card.className = 'crop-card';
+                card.className = `crop-card ${d.is_numeric ? 'is-number' : 'is-text'}`;
                 card.innerHTML = `
                     <div class="save-indicator" id="save_${d.id}">✓ ذخیره شد</div>
-                    <div class="crop-header">
+                    <div class="crop-info">
                         <span class="crop-id">#${d.id}</span>
-                        <select class="type-select ${d.type}" onchange="saveType(${d.id}, this.value, this)">
-                            <option value="NUMBER" ${d.type === 'NUMBER' ? 'selected' : ''}>🔢 NUMBER</option>
-                            <option value="TEXT" ${d.type === 'TEXT' ? 'selected' : ''}>🔤 TEXT</option>
-                        </select>
+                        <span class="crop-conf">${(d.confidence * 100).toFixed(0)}% اطمینان</span>
                     </div>
-                    <div class="crop-preview-box">
-                        <img src="${d.crop_url}" alt="Crop ${d.id}">
+                    <div class="crop-img-wrapper">
+                        <img src="${d.crop_url}" alt="Crop #${d.id}">
                     </div>
+                    <select class="type-select" onchange="updateDetectionType(${d.id}, this.value)">
+                        <option value="NUMBER" ${d.is_numeric ? 'selected' : ''}>🔢 عدد (Number)</option>
+                        <option value="TEXT" ${!d.is_numeric ? 'selected' : ''}>🔤 متن (Text)</option>
+                    </select>
                     <div class="label-input-group">
-                        <div class="label-input-label">پیش‌بینی OCR (${(d.confidence*100).toFixed(0)}%)</div>
+                        <span class="label-input-label">مقدار شناسایی‌شده:</span>
                         <input type="text" class="crop-input" value="${d.user_verified_text}" 
-                               onchange="saveText(${d.id}, this.value)"
-                               onkeydown="if(event.key==='Enter') this.blur();">
+                               onchange="updateDetectionText(${d.id}, this.value)">
                     </div>
                 `;
                 grid.appendChild(card);
             });
         }
 
-        async function saveText(detectionId, newText) {
-            if (!currentData) return;
-            const endpoint = currentData.json_key ? '/api/minio/update_crop_label' : '/api/update_label';
-            const body = currentData.json_key ? 
-                { json_key: currentData.json_key, detection_id: detectionId, text: newText } :
-                { base_name: currentData.base_name, detection_id: detectionId, text: newText };
+        async function updateDetectionText(detectionId, newText) {
+            const item = currentData.detections.find(d => d.id === detectionId);
+            if (!item) return;
 
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(body)
-            });
-            const data = await res.json();
-            if (data.success) {
-                currentData = data.data;
-                showSaved(detectionId);
+            item.user_verified_text = newText.trim();
+
+            if (currentDatasetName && currentData.json_key) {
+                await updateMinIOCropLabel(currentData.json_key, detectionId, item.user_verified_text, item.type);
+            } else {
+                await updateLocalCropLabel(currentData.base_name, detectionId, item.user_verified_text, item.type);
             }
         }
 
-        async function saveType(detectionId, newType, selectEl) {
-            if (!currentData) return;
-            selectEl.className = `type-select ${newType}`;
-            const endpoint = currentData.json_key ? '/api/minio/update_crop_label' : '/api/update_label';
-            const body = currentData.json_key ? 
-                { json_key: currentData.json_key, detection_id: detectionId, type: newType } :
-                { base_name: currentData.base_name, detection_id: detectionId, type: newType };
+        async function updateDetectionType(detectionId, newType) {
+            const item = currentData.detections.find(d => d.id === detectionId);
+            if (!item) return;
 
-            const res = await fetch(endpoint, {
+            item.type = newType;
+            item.is_numeric = (newType === "NUMBER");
+
+            if (currentDatasetName && currentData.json_key) {
+                await updateMinIOCropLabel(currentData.json_key, detectionId, item.user_verified_text, item.type);
+            } else {
+                await updateLocalCropLabel(currentData.base_name, detectionId, item.user_verified_text, item.type);
+            }
+            renderData();
+        }
+
+        async function updateMinIOCropLabel(jsonKey, detectionId, text, type) {
+            try {
+                const res = await fetch('/api/minio/update_crop_label', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        json_key: jsonKey,
+                        detection_id: detectionId,
+                        text: text,
+                        type: type
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    currentData = data.data;
+                    currentData.json_key = jsonKey;
+                    showSaved(detectionId);
+                }
+            } catch(e) {
+                console.error("Error updating MinIO crop label", e);
+            }
+        }
+
+        async function updateLocalCropLabel(baseName, detectionId, text, type) {
+            const body = { base_name: baseName, detection_id: detectionId, text: text, type: type };
+            const res = await fetch('/api/update_label', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(body)
