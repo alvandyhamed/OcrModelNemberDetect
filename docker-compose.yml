@@ -1,6 +1,7 @@
 services:
   chart-ocr:
     build: .
+    container_name: chart-ocr
     restart: always
     ports:
       - "5050:5050"
