@@ -6,7 +6,7 @@ import boto3
 from botocore.client import Config
 from botocore.exceptions import ClientError
 
-MINIO_ENDPOINT = os.environ.get('MINIO_ENDPOINT', 'https://upload.hamalv.ir')
+MINIO_ENDPOINT = os.environ.get('MINIO_ENDPOINT', 'http://minio:9000')
 MINIO_ACCESS_KEY = os.environ.get('MINIO_ACCESS_KEY', 'minioadmin')
 MINIO_SECRET_KEY = os.environ.get('MINIO_SECRET_KEY', '1MP6rLEyoGKVAoUaNJoMDW2F')
 MINIO_BUCKET = os.environ.get('MINIO_BUCKET', 'chart-ocr-datasets')
@@ -79,35 +79,43 @@ def extract_zip_file_to_minio(zip_source, dataset_prefix):
     return extracted_files
 
 def list_raw_datasets():
-    ensure_bucket_exists()
-    s3 = get_s3_client()
-    paginator = s3.get_paginator('list_objects_v2')
-    datasets = set()
-    
-    for page in paginator.paginate(Bucket=MINIO_BUCKET, Prefix='raw_uploads/'):
-        for obj in page.get('Contents', []):
-            key = obj['Key']
-            parts = key.split('/')
-            if len(parts) > 2:
-                datasets.add(parts[1])
-                
-    return sorted(list(datasets))
+    try:
+        ensure_bucket_exists()
+        s3 = get_s3_client()
+        paginator = s3.get_paginator('list_objects_v2')
+        datasets = set()
+        
+        for page in paginator.paginate(Bucket=MINIO_BUCKET, Prefix='raw_uploads/'):
+            for obj in page.get('Contents', []):
+                key = obj['Key']
+                parts = key.split('/')
+                if len(parts) > 2:
+                    datasets.add(parts[1])
+                    
+        return sorted(list(datasets))
+    except Exception as e:
+        print(f"Error listing raw datasets: {e}")
+        return []
 
 def list_dataset_images(dataset_name):
-    ensure_bucket_exists()
-    s3 = get_s3_client()
-    paginator = s3.get_paginator('list_objects_v2')
-    image_keys = []
-    
-    prefix = f"raw_uploads/{dataset_name}/"
-    for page in paginator.paginate(Bucket=MINIO_BUCKET, Prefix=prefix):
-        for obj in page.get('Contents', []):
-            key = obj['Key']
-            ext = os.path.splitext(key)[1].lower()
-            if ext in ['.png', '.jpg', '.jpeg', '.bmp']:
-                image_keys.append(key)
-                
-    return sorted(image_keys)
+    try:
+        ensure_bucket_exists()
+        s3 = get_s3_client()
+        paginator = s3.get_paginator('list_objects_v2')
+        image_keys = []
+        
+        prefix = f"raw_uploads/{dataset_name}/"
+        for page in paginator.paginate(Bucket=MINIO_BUCKET, Prefix=prefix):
+            for obj in page.get('Contents', []):
+                key = obj['Key']
+                ext = os.path.splitext(key)[1].lower()
+                if ext in ['.png', '.jpg', '.jpeg', '.bmp']:
+                    image_keys.append(key)
+                    
+        return sorted(image_keys)
+    except Exception as e:
+        print(f"Error listing dataset images: {e}")
+        return []
 
 def get_object_bytes(object_key):
     s3 = get_s3_client()
