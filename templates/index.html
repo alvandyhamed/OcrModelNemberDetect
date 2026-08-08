@@ -315,6 +315,29 @@
         </div>
     </div>
 
+    <!-- Real-Time Live ZIP Upload Progress Modal -->
+    <div id="uploadProgressModal" style="display:none; position:fixed; inset:0; background:rgba(9, 13, 22, 0.92); backdrop-filter:blur(10px); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:var(--card-bg); border:1px solid var(--accent-cyan); border-radius:18px; padding:2rem; width:90%; max-width:550px; box-shadow:0 0 40px rgba(6, 182, 212, 0.3); display:flex; flex-direction:column; gap:1.25rem;">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+                <div style="font-size:1.1rem; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:0.5rem;">
+                    <div class="spinner" style="width:24px; height:24px; border-width:3px; border-top-color:var(--accent-cyan);"></div>
+                    <span>📦 آپلود دیتاست ZIP به MinIO...</span>
+                </div>
+                <div id="uploadPercentText" style="font-family:'JetBrains Mono'; font-size:1.2rem; font-weight:800; color:var(--accent-cyan);">0%</div>
+            </div>
+
+            <!-- Progress Bar Container -->
+            <div style="background:rgba(255,255,255,0.08); border-radius:12px; height:20px; overflow:hidden; border:1px solid rgba(255,255,255,0.1); position:relative;">
+                <div id="uploadBarFill" style="background:linear-gradient(90deg, var(--accent-cyan), var(--accent-green)); height:100%; width:0%; transition:width 0.2s ease; box-shadow:0 0 15px var(--accent-cyan);"></div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-muted);">
+                <div id="uploadStatusText" style="color:var(--text-main); font-weight:600;">در حال ارسال داده‌ها...</div>
+                <div id="uploadSizeText" style="font-family:'JetBrains Mono'; font-weight:700; color:var(--accent-cyan);">0 MB / 0 MB</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Real-Time Live Batch Processing Progress Modal -->
     <div id="progressModal" style="display:none; position:fixed; inset:0; background:rgba(9, 13, 22, 0.92); backdrop-filter:blur(10px); z-index:1000; align-items:center; justify-content:center;">
         <div style="background:var(--card-bg); border:1px solid var(--accent-purple); border-radius:18px; padding:2rem; width:90%; max-width:650px; box-shadow:0 0 40px rgba(139, 92, 246, 0.3); display:flex; flex-direction:column; gap:1.25rem;">
@@ -383,7 +406,7 @@
                 const files = dt.files;
                 if (files.length > 0) {
                     const file = files[0];
-                    if (file.name.toLowerCase().endswith('.zip')) uploadZipToMinIO(file);
+                    if (file.name.toLowerCase().endsWith('.zip')) uploadZipToMinIO(file);
                     else uploadSingleImage(file);
                 }
             });
@@ -432,25 +455,68 @@
             });
         }
 
-        async function uploadZipToMinIO(file) {
-            showLoading(true, "در حال آپلود زیپ و اکستراکت خودکار درون MinIO S3...");
+        function uploadZipToMinIO(file) {
+            const modal = document.getElementById('uploadProgressModal');
+            const barFill = document.getElementById('uploadBarFill');
+            const percentText = document.getElementById('uploadPercentText');
+            const statusText = document.getElementById('uploadStatusText');
+            const sizeText = document.getElementById('uploadSizeText');
+
+            modal.style.display = 'flex';
+            barFill.style.width = '0%';
+            percentText.innerText = '0%';
+            statusText.innerText = `در حال آماده‌سازی آپلود '${file.name}'...`;
+            sizeText.innerText = `0 MB / ${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+
             const formData = new FormData();
             formData.append('file', file);
-            try {
-                const res = await fetch('/api/minio/upload_zip', { method: 'POST', body: formData });
-                const data = await res.json();
-                if (data.success) {
-                    alert(`دیتاست '${data.dataset_name}' با موفقیت آپلود و ${data.total_extracted} فایل اکستراکت شد!`);
-                    await loadMinIODatasets();
-                    processDatasetMinIO(data.dataset_name);
-                } else {
-                    alert('خطا: ' + data.error);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/minio/upload_zip', true);
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    const loadedMB = (e.loaded / (1024 * 1024)).toFixed(1);
+                    const totalMB = (e.total / (1024 * 1024)).toFixed(1);
+
+                    barFill.style.width = `${percent}%`;
+                    percentText.innerText = `${percent}%`;
+                    sizeText.innerText = `${loadedMB} MB / ${totalMB} MB`;
+                    statusText.innerText = `در حال ارسال داده‌ها به سرور (${percent}%)...`;
+
+                    if (percent === 100) {
+                        statusText.innerText = 'آپلود تکمیل شد! در حال آنزیپ و اکستراکت در MinIO S3...';
+                    }
                 }
-            } catch(e) {
-                alert('خطا در آپلود زیپ به MinIO');
-            } finally {
-                showLoading(false);
-            }
+            };
+
+            xhr.onload = async () => {
+                modal.style.display = 'none';
+                if (xhr.status === 200) {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        if (data.success) {
+                            alert(`دیتاست '${data.dataset_name}' با موفقیت آپلود و ${data.total_extracted} فایل اکستراکت شد!`);
+                            await loadMinIODatasets();
+                            processDatasetMinIO(data.dataset_name);
+                        } else {
+                            alert('خطا: ' + (data.error || 'آپلود ناموفق بود'));
+                        }
+                    } catch(e) {
+                        alert('خطا در پردازش پاسخ سرور');
+                    }
+                } else {
+                    alert(`خطای سرور (${xhr.status}): آپلود دیتاست ناموفق بود`);
+                }
+            };
+
+            xhr.onerror = () => {
+                modal.style.display = 'none';
+                alert('خطای شبکه هنگام آپلود فایل ZIP');
+            };
+
+            xhr.send(formData);
         }
 
         async function uploadSingleImage(file) {

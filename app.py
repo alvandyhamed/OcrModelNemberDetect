@@ -309,29 +309,38 @@ def update_label():
 
 @app.route('/api/minio/upload_zip', methods=['POST'])
 def minio_upload_zip():
-    if 'file' not in request.files:
-        return jsonify({"error": "No ZIP file uploaded"}), 400
-    file = request.files['file']
-    if not file.filename.lower().endswith('.zip'):
-        return jsonify({"error": "File must be a .zip archive"}), 400
-        
-    dataset_name = os.path.splitext(file.filename)[0].replace(' ', '_')
-    
-    temp_path = os.path.join(UPLOAD_FOLDER, f"temp_{dataset_name}.zip")
-    file.save(temp_path)
-    
     try:
-        extracted_files = minio_helper.extract_zip_file_to_minio(temp_path, dataset_name)
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        if 'file' not in request.files:
+            return jsonify({"error": "No ZIP file uploaded"}), 400
+        file = request.files['file']
+        if not file.filename:
+            return jsonify({"error": "No selected file"}), 400
+        if not file.filename.lower().endswith('.zip'):
+            return jsonify({"error": "File must be a .zip archive"}), 400
             
-    return jsonify({
-        "success": True,
-        "dataset_name": dataset_name,
-        "total_extracted": len(extracted_files),
-        "files": extracted_files
-    })
+        clean_name = os.path.splitext(file.filename)[0].replace(' ', '_')
+        dataset_name = "".join(c for c in clean_name if c.isalnum() or c in ('_', '-')).strip('_')
+        if not dataset_name:
+            dataset_name = "dataset_zip"
+        
+        temp_path = os.path.join(UPLOAD_FOLDER, f"temp_{dataset_name}.zip")
+        file.save(temp_path)
+        
+        try:
+            extracted_files = minio_helper.extract_zip_file_to_minio(temp_path, dataset_name)
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+                
+        return jsonify({
+            "success": True,
+            "dataset_name": dataset_name,
+            "total_extracted": len(extracted_files),
+            "files": extracted_files
+        })
+    except Exception as e:
+        print(f"ZIP Upload Exception: {e}")
+        return jsonify({"error": f"ZIP Upload Error: {str(e)}"}), 500
 
 @app.route('/api/minio/datasets')
 def minio_list_datasets():
