@@ -19,6 +19,7 @@ def get_s3_client():
     return session.client(
         's3',
         endpoint_url=MINIO_ENDPOINT,
+        config=Config(signature_version='s3v4'),
         region_name='us-east-1'
     )
 
