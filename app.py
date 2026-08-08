@@ -5,7 +5,7 @@ import glob
 import cv2
 import numpy as np
 import zipfile
-from flask import Flask, render_template, request, jsonify, send_from_directory, send_file, Response
+from flask import Flask, render_template, request, jsonify, send_from_directory, send_file, Response, make_response
 import easyocr
 
 import minio_helper
@@ -57,9 +57,6 @@ def extract_isolated_digits(gray, reader):
     return isolated_results
 
 def process_chart_bytes(img_bytes, filename, save_to_minio=False, dataset_name=None):
-    """
-    Process image bytes from memory (local or MinIO) and run OCR & Digit extraction.
-    """
     ocr = get_ocr_reader()
     nparr = np.frombuffer(img_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -119,7 +116,6 @@ def process_chart_bytes(img_bytes, filename, save_to_minio=False, dataset_name=N
             crop_id = len(detections) + 1
             crop_filename = f"{base_name}_crop_{crop_id}.png"
             
-            # Encode crop image to bytes
             _, crop_buf = cv2.imencode('.png', crop_img)
             crop_bytes = crop_buf.tobytes() if crop_img.size > 0 else b''
             
@@ -222,12 +218,35 @@ def process_chart_bytes(img_bytes, filename, save_to_minio=False, dataset_name=N
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    response = make_response(render_template('index.html'))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route('/api/samples')
 def get_samples():
     samples = sorted(glob.glob("Screenshot*.png"))
     return jsonify([os.path.basename(s) for s in samples])
+
+@app.route('/api/upload_image', methods=['POST'])
+def upload_single_image():
+    if 'file' not in request.files:
+        return jsonify({"error": "No image file uploaded"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "Empty filename"}), 400
+        
+    filepath = os.path.join(UPLOAD_FOLDER, file.filename)
+    file.save(filepath)
+    
+    with open(filepath, 'rb') as f:
+        img_bytes = f.read()
+        
+    result = process_chart_bytes(img_bytes, file.filename)
+    if result:
+        return jsonify({"success": True, "data": result})
+    return jsonify({"error": "Failed to process uploaded image"}), 500
 
 @app.route('/api/process', methods=['POST'])
 def process():
@@ -341,7 +360,6 @@ def minio_process_dataset():
 
 @app.route('/api/minio/dataset_details/<dataset_name>')
 def minio_dataset_details(dataset_name):
-    # Fetch all JSON objects from processed_datasets/<dataset_name>/json/
     s3 = minio_helper.get_s3_client()
     prefix = f"processed_datasets/{dataset_name}/json/"
     paginator = s3.get_paginator('list_objects_v2')
@@ -398,9 +416,6 @@ def minio_update_crop_label():
 
 @app.route('/api/minio/export_training_zip/<dataset_name>')
 def minio_export_training_zip(dataset_name):
-    """
-    Export full dataset training package (ZIP) with Label Studio & YOLO-OBB format.
-    """
     s3 = minio_helper.get_s3_client()
     prefix = f"processed_datasets/{dataset_name}/json/"
     paginator = s3.get_paginator('list_objects_v2')
@@ -420,7 +435,6 @@ def minio_export_training_zip(dataset_name):
                 w_img = data.get('image_width', 1000)
                 h_img = data.get('image_height', 1000)
                 
-                # Add Label Studio task
                 ls_results = []
                 for d in data['detections']:
                     bx = d['box']
@@ -459,10 +473,8 @@ def minio_export_training_zip(dataset_name):
                     "predictions": [{"model_version": "hybrid_chart_ocr_v1", "result": ls_results}]
                 })
                 
-                # Add raw json per chart
                 zf.writestr(f"annotations/{base_name}_data.json", json.dumps(data, indent=2, ensure_ascii=False))
                 
-        # Write master Label Studio JSON
         zf.writestr("labelstudio_import_all.json", json.dumps(all_labelstudio_tasks, indent=2, ensure_ascii=False))
         
     zip_buffer.seek(0)
@@ -471,8 +483,6 @@ def minio_export_training_zip(dataset_name):
         mimetype='application/zip',
         headers={"Content-Disposition": f"attachment;filename={dataset_name}_verified_training_dataset.zip"}
     )
-
-# --- Serving Files (Uploads, Outputs, Crops, MinIO) ---
 
 @app.route('/files/uploads/<path:filename>')
 def serve_upload(filename):
@@ -488,9 +498,6 @@ def serve_crop(filename):
 
 @app.route('/files/minio/<path:object_key>')
 def serve_minio_object(object_key):
-    """
-    Stream bytes directly from MinIO object key so frontend displays MinIO images.
-    """
     try:
         data = minio_helper.get_object_bytes(object_key)
         ext = os.path.splitext(object_key)[1].lower()

@@ -1,22 +1,23 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chart OCR & MinIO Dataset Labeling Studio</title>
+    <title>Chart OCR & MinIO Dataset Studio</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #0f172a;
-            --panel-bg: rgba(30, 41, 59, 0.75);
-            --border-color: rgba(255, 255, 255, 0.1);
+            --bg-dark: #090d16;
+            --panel-bg: rgba(21, 32, 54, 0.85);
+            --border-color: rgba(255, 255, 255, 0.12);
             --accent-green: #10b981;
-            --accent-green-glow: rgba(16, 185, 129, 0.3);
+            --accent-green-glow: rgba(16, 185, 129, 0.4);
             --accent-cyan: #06b6d4;
-            --accent-cyan-glow: rgba(6, 182, 212, 0.3);
+            --accent-cyan-glow: rgba(6, 182, 212, 0.4);
             --accent-purple: #8b5cf6;
+            --accent-pink: #ec4899;
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
         }
@@ -24,189 +25,205 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Vazirmatn', sans-serif;
             background-color: var(--bg-dark);
             color: var(--text-main);
             min-height: 100vh;
-            display: flex;
-            flex-direction: column;
+            display: flex; flex-direction: column;
             overflow-x: hidden;
         }
 
         header {
-            background: rgba(15, 23, 42, 0.9);
-            backdrop-filter: blur(12px);
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(16px);
             border-bottom: 1px solid var(--border-color);
             padding: 1rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            display: flex; justify-content: space-between; align-items: center;
+            position: sticky; top: 0; z-index: 100;
         }
 
-        .brand { display: flex; align-items: center; gap: 0.75rem; }
+        .brand { display: flex; align-items: center; gap: 0.85rem; }
 
         .brand-icon {
-            width: 36px; height: 36px;
+            width: 42px; height: 42px;
             background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
-            border-radius: 10px;
+            border-radius: 12px;
             display: flex; align-items: center; justify-content: center;
-            font-weight: 700; font-size: 1.2rem;
-            box-shadow: 0 0 15px var(--accent-cyan-glow);
+            font-weight: 700; font-size: 1.4rem;
+            box-shadow: 0 0 20px var(--accent-cyan-glow);
         }
 
         .brand-title {
-            font-size: 1.25rem; font-weight: 700; letter-spacing: -0.5px;
-            background: linear-gradient(to right, #ffffff, #94a3b8);
+            font-size: 1.35rem; font-weight: 700;
+            background: linear-gradient(to left, #ffffff, #cbd5e1);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
 
         .header-actions { display: flex; gap: 1rem; align-items: center; }
 
-        .btn-export {
-            background: linear-gradient(135deg, var(--accent-green), #059669);
-            color: #ffffff; border: none; padding: 0.6rem 1.2rem;
-            border-radius: 10px; font-weight: 600; font-size: 0.85rem;
+        .btn-action {
+            border: none; padding: 0.65rem 1.3rem; border-radius: 12px;
+            font-weight: 700; font-size: 0.9rem; font-family: 'Vazirmatn', sans-serif;
             cursor: pointer; display: flex; align-items: center; gap: 0.5rem;
-            box-shadow: 0 0 15px var(--accent-green-glow); transition: all 0.2s ease;
+            transition: all 0.25 ease; text-decoration: none;
         }
 
-        .btn-export:hover { transform: translateY(-2px); box-shadow: 0 0 20px var(--accent-green-glow); }
+        .btn-zip {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+            color: #ffffff; box-shadow: 0 0 15px rgba(236, 72, 153, 0.3);
+        }
+        .btn-zip:hover { transform: translateY(-2px); box-shadow: 0 0 25px rgba(236, 72, 153, 0.5); }
+
+        .btn-img {
+            background: linear-gradient(135deg, var(--accent-cyan), #0284c7);
+            color: #ffffff; box-shadow: 0 0 15px var(--accent-cyan-glow);
+        }
+        .btn-img:hover { transform: translateY(-2px); box-shadow: 0 0 25px var(--accent-cyan-glow); }
+
+        .btn-export {
+            background: linear-gradient(135deg, var(--accent-green), #059669);
+            color: #ffffff; box-shadow: 0 0 15px var(--accent-green-glow);
+        }
+        .btn-export:hover { transform: translateY(-2px); box-shadow: 0 0 25px var(--accent-green-glow); }
 
         .container {
-            display: grid; grid-template-columns: 340px 1fr;
+            display: grid; grid-template-columns: 360px 1fr;
             gap: 1.5rem; padding: 1.5rem 2rem; flex: 1;
-            max-width: 1850px; margin: 0 auto; width: 100%;
+            max-width: 1920px; margin: 0 auto; width: 100%;
         }
 
         .sidebar { display: flex; flex-direction: column; gap: 1.25rem; }
 
         .card {
             background: var(--panel-bg); backdrop-filter: blur(12px);
-            border: 1px solid var(--border-color); border-radius: 16px;
-            padding: 1.25rem; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color); border-radius: 18px;
+            padding: 1.25rem; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
 
         .card-title {
-            font-size: 0.85rem; font-weight: 600; text-transform: uppercase;
-            letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.85rem;
+            font-size: 0.88rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.03em; color: var(--text-muted); margin-bottom: 0.85rem;
             display: flex; align-items: center; gap: 0.5rem;
         }
 
-        .sample-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 180px; overflow-y: auto; }
+        .big-upload-zone {
+            border: 2px dashed var(--accent-purple); border-radius: 14px;
+            padding: 1.5rem 1rem; text-align: center; cursor: pointer;
+            background: linear-gradient(180deg, rgba(139, 92, 246, 0.1), rgba(15, 23, 42, 0.4));
+            transition: all 0.25s ease; position: relative; overflow: hidden;
+        }
+        .big-upload-zone:hover {
+            border-color: var(--accent-pink); background: rgba(236, 72, 153, 0.15);
+            transform: scale(1.01);
+        }
+        .big-upload-zone .icon { font-size: 2.2rem; margin-bottom: 0.5rem; }
+        .big-upload-zone h4 { font-size: 1rem; font-weight: 700; color: #fff; }
+        .big-upload-zone p { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+        .sample-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 220px; overflow-y: auto; }
 
         .sample-btn {
-            background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);
-            color: var(--text-main); padding: 0.65rem 0.85rem; border-radius: 8px;
-            cursor: pointer; text-align: left; font-size: 0.82rem;
-            font-family: 'JetBrains Mono', monospace; transition: all 0.2s ease;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-main); padding: 0.75rem 0.9rem; border-radius: 10px;
+            cursor: pointer; text-align: right; font-size: 0.85rem;
+            font-family: 'Vazirmatn', sans-serif; transition: all 0.2s ease;
+            display: flex; align-items: center; justify-content: space-between;
         }
-
-        .sample-btn:hover { background: rgba(255, 255, 255, 0.08); border-color: var(--accent-cyan); }
+        .sample-btn:hover { background: rgba(255, 255, 255, 0.1); border-color: var(--accent-cyan); }
         .sample-btn.active {
-            background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(139, 92, 246, 0.2));
-            border-color: var(--accent-cyan); box-shadow: 0 0 12px var(--accent-cyan-glow);
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.25), rgba(139, 92, 246, 0.25));
+            border-color: var(--accent-cyan); box-shadow: 0 0 15px var(--accent-cyan-glow);
         }
-
-        .dropzone {
-            border: 2px dashed rgba(255, 255, 255, 0.15); border-radius: 12px;
-            padding: 1.25rem 1rem; text-align: center; cursor: pointer; transition: all 0.2s ease;
-        }
-
-        .dropzone:hover { border-color: var(--accent-green); background: rgba(16, 185, 129, 0.05); }
-        .dropzone p { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem; }
 
         .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
-        .stat-box { background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 12px; padding: 0.85rem; text-align: center; }
-        .stat-value { font-size: 1.4rem; font-weight: 700; margin-top: 0.25rem; }
+        .stat-box { background: rgba(9, 13, 22, 0.7); border: 1px solid var(--border-color); border-radius: 12px; padding: 0.85rem; text-align: center; }
+        .stat-value { font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; font-family: 'JetBrains Mono', monospace; }
         .stat-value.green { color: var(--accent-green); }
         .stat-value.cyan { color: var(--accent-cyan); }
-        .stat-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; }
+        .stat-label { font-size: 0.72rem; color: var(--text-muted); }
 
         .workspace { display: flex; flex-direction: column; gap: 1rem; }
 
         .tab-bar { display: flex; gap: 0.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; }
         .tab-btn {
             background: transparent; border: none; color: var(--text-muted);
-            padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer;
-            font-weight: 500; font-size: 0.9rem; transition: all 0.2s ease;
+            padding: 0.65rem 1.2rem; border-radius: 10px; cursor: pointer;
+            font-weight: 600; font-size: 0.9rem; font-family: 'Vazirmatn', sans-serif; transition: all 0.2s ease;
         }
-        .tab-btn:hover { color: var(--text-main); background: rgba(255, 255, 255, 0.05); }
-        .tab-btn.active { color: var(--text-main); background: rgba(255, 255, 255, 0.1); font-weight: 600; }
+        .tab-btn:hover { color: var(--text-main); background: rgba(255, 255, 255, 0.06); }
+        .tab-btn.active { color: var(--text-main); background: rgba(255, 255, 255, 0.12); font-weight: 700; }
 
         .viewer-card {
             background: var(--panel-bg); backdrop-filter: blur(12px);
-            border: 1px solid var(--border-color); border-radius: 16px;
+            border: 1px solid var(--border-color); border-radius: 18px;
             padding: 1.25rem; display: flex; flex-direction: column; gap: 1.25rem;
         }
 
         .image-viewport {
-            width: 100%; height: 480px; background: #020617; border-radius: 12px;
+            width: 100%; height: 520px; background: #020617; border-radius: 14px;
             overflow: auto; display: flex; align-items: center; justify-content: center;
-            position: relative; border: 1px solid rgba(255, 255, 255, 0.05);
+            position: relative; border: 1px solid rgba(255, 255, 255, 0.08);
         }
         .image-viewport img { max-width: 100%; max-height: 100%; object-fit: contain; }
 
         .crops-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 1rem; max-height: 540px; overflow-y: auto; padding: 0.5rem;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 1rem; max-height: 560px; overflow-y: auto; padding: 0.5rem;
         }
 
         .crop-card {
-            background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-color);
-            border-radius: 12px; padding: 0.85rem; display: flex; flex-direction: column;
+            background: rgba(9, 13, 22, 0.9); border: 1px solid var(--border-color);
+            border-radius: 14px; padding: 0.9rem; display: flex; flex-direction: column;
             gap: 0.75rem; transition: all 0.2s ease; position: relative;
         }
-        .crop-card:hover { border-color: var(--accent-cyan); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); }
+        .crop-card:hover { border-color: var(--accent-cyan); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5); }
 
         .crop-header { display: flex; justify-content: space-between; align-items: center; }
-        .crop-id { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); }
+        .crop-id { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); }
 
         .type-select {
-            background: rgba(15, 23, 42, 0.9); border: 1px solid var(--border-color);
-            color: var(--text-main); padding: 0.2rem 0.4rem; border-radius: 6px;
-            font-size: 0.7rem; font-weight: 600; cursor: pointer; outline: none;
+            background: rgba(15, 23, 42, 0.95); border: 1px solid var(--border-color);
+            color: var(--text-main); padding: 0.3rem 0.5rem; border-radius: 8px;
+            font-size: 0.75rem; font-weight: 700; cursor: pointer; outline: none;
+            font-family: 'Vazirmatn', sans-serif;
         }
         .type-select.NUMBER { color: var(--accent-green); border-color: var(--accent-green); }
         .type-select.TEXT { color: var(--accent-cyan); border-color: var(--accent-cyan); }
 
         .crop-preview-box {
-            height: 75px; background: #000; border-radius: 8px; display: flex;
+            height: 80px; background: #000; border-radius: 10px; display: flex;
             align-items: center; justify-content: center; overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.05); padding: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.08); padding: 4px;
         }
         .crop-preview-box img { max-width: 100%; max-height: 100%; object-fit: contain; filter: contrast(1.1); }
 
         .label-input-group { display: flex; flex-direction: column; gap: 0.25rem; }
-        .label-input-label { font-size: 0.68rem; color: var(--text-muted); }
+        .label-input-label { font-size: 0.7rem; color: var(--text-muted); }
 
         .crop-input {
-            background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15);
-            color: var(--text-main); padding: 0.5rem 0.75rem; border-radius: 8px;
-            font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600;
-            outline: none; transition: all 0.2s ease;
+            background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.18);
+            color: var(--text-main); padding: 0.55rem 0.85rem; border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; font-weight: 600;
+            outline: none; transition: all 0.2s ease; direction: ltr; text-align: center;
         }
-        .crop-input:focus { border-color: var(--accent-green); background: rgba(16, 185, 129, 0.05); box-shadow: 0 0 8px var(--accent-green-glow); }
+        .crop-input:focus { border-color: var(--accent-green); background: rgba(16, 185, 129, 0.08); box-shadow: 0 0 10px var(--accent-green-glow); }
 
-        .save-indicator { position: absolute; top: 8px; right: 8px; font-size: 0.75rem; color: var(--accent-green); opacity: 0; transition: opacity 0.3s ease; }
+        .save-indicator { position: absolute; top: 10px; left: 10px; font-size: 0.75rem; color: var(--accent-green); opacity: 0; transition: opacity 0.3s ease; }
         .save-indicator.active { opacity: 1; }
 
         .chart-selector {
-            background: rgba(15, 23, 42, 0.9); border: 1px solid var(--border-color);
-            color: var(--text-main); padding: 0.5rem 1rem; border-radius: 8px;
-            font-size: 0.85rem; font-family: 'JetBrains Mono', monospace; outline: none; width: 100%;
+            background: rgba(9, 13, 22, 0.95); border: 1px solid var(--border-color);
+            color: var(--text-main); padding: 0.65rem 1rem; border-radius: 10px;
+            font-size: 0.9rem; font-family: 'JetBrains Mono', monospace; outline: none; width: 100%;
         }
 
         .loading-overlay {
-            position: absolute; inset: 0; background: rgba(15, 23, 42, 0.85);
-            backdrop-filter: blur(4px); display: flex; flex-direction: column;
+            position: absolute; inset: 0; background: rgba(9, 13, 22, 0.9);
+            backdrop-filter: blur(6px); display: flex; flex-direction: column;
             align-items: center; justify-content: center; gap: 1rem; z-index: 50;
         }
         .spinner {
-            width: 40px; height: 40px; border: 3px solid rgba(255, 255, 255, 0.1);
+            width: 48px; height: 48px; border: 4px solid rgba(255, 255, 255, 0.1);
             border-top-color: var(--accent-cyan); border-radius: 50%; animation: spin 1s infinite linear;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -220,41 +237,57 @@
             <div class="brand-title">Chart OCR & MinIO Dataset Labeling Studio</div>
         </div>
         <div class="header-actions">
-            <button class="btn-export" onclick="exportTrainingZip()">
-                📥 Export Training ZIP (Label Studio + Images)
+            <button class="btn-action btn-zip" onclick="triggerZipUpload()">
+                📦 آپلود ZIP دیتاست در MinIO
+            </button>
+            <button class="btn-action btn-img" onclick="triggerImageUpload()">
+                🖼️ آپلود عکس تک نمودار
+            </button>
+            <button class="btn-action btn-export" onclick="exportTrainingZip()">
+                📥 خروجی کامل Label Studio (ZIP)
             </button>
         </div>
     </header>
 
+    <!-- Hidden file inputs -->
+    <input type="file" id="zipFileInput" accept=".zip" style="display:none">
+    <input type="file" id="imageFileInput" accept="image/*" style="display:none">
+
     <div class="container">
         <!-- Sidebar -->
         <div class="sidebar">
+            <!-- Upload Card -->
             <div class="card">
-                <div class="card-title">🗄️ MinIO Datasets (ZIP Archives)</div>
-                <div class="dropzone" id="zipDropzone" style="margin-bottom: 0.75rem;">
-                    <div style="font-size: 1.25rem;">📦</div>
-                    <p>Upload Dataset ZIP to MinIO</p>
-                    <input type="file" id="zipFileInput" accept=".zip" style="display:none">
-                </div>
-                <div class="sample-list" id="minioDatasetList">
-                    <!-- Populated by JS -->
+                <div class="card-title">📤 آپلود فایل و دیتاست</div>
+                <div class="big-upload-zone" onclick="triggerZipUpload()">
+                    <div class="icon">📦</div>
+                    <h4>آپلود ZIP دیتاست (MinIO)</h4>
+                    <p>فایل زیپ را اینجا بکشید یا رها کنید</p>
                 </div>
             </div>
 
+            <!-- MinIO Datasets List -->
             <div class="card">
-                <div class="card-title">📁 Local Sample Charts</div>
+                <div class="card-title">🗄️ پوشه‌های دیتاست در MinIO</div>
+                <div class="sample-list" id="minioDatasetList"></div>
+            </div>
+
+            <!-- Local Samples List -->
+            <div class="card">
+                <div class="card-title">📁 نمونه‌های لوکال</div>
                 <div class="sample-list" id="sampleList"></div>
             </div>
 
+            <!-- Stats -->
             <div class="card">
-                <div class="card-title">📊 Dataset Statistics</div>
+                <div class="card-title">📊 آمار اعدادی و متنی</div>
                 <div class="stats-grid">
                     <div class="stat-box">
-                        <div class="stat-label">Numbers</div>
+                        <div class="stat-label">تعداد اعداد</div>
                         <div class="stat-value green" id="statNumbers">0</div>
                     </div>
                     <div class="stat-box">
-                        <div class="stat-label">Labels</div>
+                        <div class="stat-label">تعداد متون</div>
                         <div class="stat-value cyan" id="statTexts">0</div>
                     </div>
                 </div>
@@ -266,27 +299,27 @@
             <div class="viewer-card">
                 <!-- Dataset Chart Selector -->
                 <div id="datasetChartBar" style="display:none; flex-direction:column; gap:0.5rem;">
-                    <div class="card-title" style="margin:0;">🖼️ Dataset Processed Charts</div>
+                    <div class="card-title" style="margin:0;">🖼️ تصاویر پردازش‌شده دیتاست</div>
                     <select class="chart-selector" id="datasetChartSelect" onchange="onDatasetChartChange(this.value)"></select>
                 </div>
 
                 <div class="tab-bar">
-                    <button class="tab-btn active" onclick="switchView('crops')">✂️ Interactive Crops Gallery</button>
-                    <button class="tab-btn" onclick="switchView('annotated')">🎯 Bounding Boxes Chart</button>
-                    <button class="tab-btn" onclick="switchView('original')">🖼️ Original Chart</button>
+                    <button class="tab-btn active" onclick="switchView('crops')">✂️ گالری تعاملی کراپ‌ها</button>
+                    <button class="tab-btn" onclick="switchView('annotated')">🎯 نمودار کادربندی‌شده</button>
+                    <button class="tab-btn" onclick="switchView('original')">🖼️ نمودار اصلی</button>
                 </div>
 
                 <div class="image-viewport" id="viewport" style="display:none;">
                     <div class="loading-overlay" id="loadingOverlay" style="display:none;">
                         <div class="spinner"></div>
-                        <div style="font-weight: 500;" id="loadingText">Processing dataset & running OCR...</div>
+                        <div style="font-weight: 600; font-size:1rem;" id="loadingText">در حال استخراج و پردازش OCR...</div>
                     </div>
                     <img id="mainImage" src="" alt="Chart View">
                 </div>
 
                 <div id="cropsContainer">
-                    <div class="card-title" style="margin-bottom: 0.75rem;">
-                        ✏️ Crop Snippets (Edit prediction or Type dropdown to verify)
+                    <div class="card-title" style="margin-bottom: 0.85rem;">
+                        ✏️ برش اعداد و حروف (جهت ویرایش یا تغییر نوع NUMBER/TEXT کلیک کنید)
                     </div>
                     <div class="crops-grid" id="cropsGrid"></div>
                 </div>
@@ -304,13 +337,34 @@
             loadSamples();
             loadMinIODatasets();
 
-            const zipDropzone = document.getElementById('zipDropzone');
             const zipFileInput = document.getElementById('zipFileInput');
-            zipDropzone.addEventListener('click', () => zipFileInput.click());
+            const imageFileInput = document.getElementById('imageFileInput');
+
             zipFileInput.addEventListener('change', (e) => {
                 if (e.target.files.length > 0) uploadZipToMinIO(e.target.files[0]);
             });
+
+            imageFileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) uploadSingleImage(e.target.files[0]);
+            });
+
+            // Drag and drop anywhere on page
+            window.addEventListener('dragover', (e) => e.preventDefault());
+            window.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (e.dataTransfer.files.length > 0) {
+                    const file = e.dataTransfer.files[0];
+                    if (file.name.toLowerCase().endsWith('.zip')) {
+                        uploadZipToMinIO(file);
+                    } else if (file.type.startsWith('image/')) {
+                        uploadSingleImage(file);
+                    }
+                }
+            });
         });
+
+        function triggerZipUpload() { document.getElementById('zipFileInput').click(); }
+        function triggerImageUpload() { document.getElementById('imageFileInput').click(); }
 
         async function loadSamples() {
             const res = await fetch('/api/samples');
@@ -318,10 +372,10 @@
             const listEl = document.getElementById('sampleList');
             listEl.innerHTML = '';
 
-            samples.forEach((sample, idx) => {
+            samples.forEach((sample) => {
                 const btn = document.createElement('button');
                 btn.className = 'sample-btn';
-                btn.innerText = `📄 ${sample}`;
+                btn.innerHTML = `<span>📄 ${sample}</span> <span>➔</span>`;
                 btn.onclick = () => {
                     document.querySelectorAll('.sample-btn').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
@@ -340,7 +394,7 @@
             listEl.innerHTML = '';
 
             if (datasets.length === 0) {
-                listEl.innerHTML = '<div style="font-size:0.75rem; color:var(--text-muted);">No ZIP datasets uploaded yet</div>';
+                listEl.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); text-align:center; padding:0.5rem;">هیچ دیتاست زیپی هنوز آپلود نشده است</div>';
                 return;
             }
 
@@ -351,12 +405,12 @@
                 const btn = document.createElement('button');
                 btn.className = 'sample-btn';
                 btn.style.flex = '1';
-                btn.innerText = `📦 ${ds}`;
+                btn.innerHTML = `<span>📦 ${ds}</span>`;
                 btn.onclick = () => loadDatasetDetails(ds);
                 
                 const processBtn = document.createElement('button');
-                processBtn.style.cssText = 'background:var(--accent-purple); color:#fff; border:none; padding:0.4rem 0.6rem; border-radius:6px; font-size:0.75rem; cursor:pointer; font-weight:600;';
-                processBtn.innerText = '⚡ Process';
+                processBtn.style.cssText = 'background:var(--accent-purple); color:#fff; border:none; padding:0.45rem 0.7rem; border-radius:8px; font-size:0.78rem; cursor:pointer; font-weight:700; font-family:Vazirmatn; transition:all 0.2s;';
+                processBtn.innerText = '⚡ پردازش';
                 processBtn.onclick = (e) => { e.stopPropagation(); processDatasetMinIO(ds); };
                 
                 container.appendChild(btn);
@@ -366,28 +420,50 @@
         }
 
         async function uploadZipToMinIO(file) {
-            showLoading(true, "Uploading ZIP & extracting to MinIO S3...");
+            showLoading(true, "در حال آپلود زیپ و اکستراکت خودکار درون MinIO S3...");
             const formData = new FormData();
             formData.append('file', file);
             try {
                 const res = await fetch('/api/minio/upload_zip', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
-                    alert(`Dataset '${data.dataset_name}' uploaded successfully with ${data.total_extracted} files!`);
-                    loadMinIODatasets();
+                    alert(`دیتاست '${data.dataset_name}' با موفقیت آپلود و ${data.total_extracted} فایل اکستراکت شد!`);
+                    await loadMinIODatasets();
                     processDatasetMinIO(data.dataset_name);
                 } else {
-                    alert('Error: ' + data.error);
+                    alert('خطا: ' + data.error);
                 }
             } catch(e) {
-                alert('Error uploading ZIP to MinIO');
+                alert('خطا در آپلود زیپ به MinIO');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function uploadSingleImage(file) {
+            showLoading(true, "در حال آپلود عکس و اجرای هوش مصنوعی OCR...");
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const res = await fetch('/api/upload_image', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.success) {
+                    currentDatasetName = null;
+                    document.getElementById('datasetChartBar').style.display = 'none';
+                    currentData = data.data;
+                    renderData();
+                } else {
+                    alert('خطا: ' + data.error);
+                }
+            } catch(e) {
+                alert('خطا در آپلود عکس نمودار');
             } finally {
                 showLoading(false);
             }
         }
 
         async function processDatasetMinIO(datasetName) {
-            showLoading(true, `Processing all chart images in '${datasetName}' dataset with OCR...`);
+            showLoading(true, `در حال پردازش تمام تصاویر نمودار در دیتاست '${datasetName}' با OCR...`);
             try {
                 const res = await fetch('/api/minio/process_dataset', {
                     method: 'POST',
@@ -400,7 +476,7 @@
                     loadDatasetDetails(datasetName);
                 }
             } catch(e) {
-                alert('Error batch processing MinIO dataset');
+                alert('خطا در پردازش دسته‌ای دیتاست MinIO');
             } finally {
                 showLoading(false);
             }
@@ -418,7 +494,7 @@
 
             if (datasetCharts.length === 0) {
                 chartBar.style.display = 'none';
-                alert(`Dataset '${datasetName}' has not been processed yet. Click '⚡ Process' button to start OCR.`);
+                alert(`دیتاست '${datasetName}' هنوز پردازش نشده است. لطفاً روی دکمه '⚡ پردازش' کلیک کنید.`);
                 return;
             }
 
@@ -426,7 +502,7 @@
             datasetCharts.forEach((c, idx) => {
                 const opt = document.createElement('option');
                 opt.value = idx;
-                opt.innerText = `📄 ${c.filename} (${c.number_count} numbers, ${c.text_count} text)`;
+                opt.innerText = `📄 ${c.filename} (${c.number_count} عدد، ${c.text_count} متن)`;
                 selectEl.appendChild(opt);
             });
 
@@ -440,7 +516,7 @@
         }
 
         async function processSample(filename) {
-            showLoading(true, "Processing chart sample...");
+            showLoading(true, "در حال پردازش نمونه نمودار...");
             try {
                 const res = await fetch('/api/process', {
                     method: 'POST',
@@ -450,7 +526,7 @@
                 currentData = await res.json();
                 renderData();
             } catch(e) {
-                alert('Error processing image');
+                alert('خطا در پردازش تصویر');
             } finally {
                 showLoading(false);
             }
@@ -471,7 +547,7 @@
                 const card = document.createElement('div');
                 card.className = 'crop-card';
                 card.innerHTML = `
-                    <div class="save-indicator" id="save_${d.id}">✓ Saved</div>
+                    <div class="save-indicator" id="save_${d.id}">✓ ذخیره شد</div>
                     <div class="crop-header">
                         <span class="crop-id">#${d.id}</span>
                         <select class="type-select ${d.type}" onchange="saveType(${d.id}, this.value, this)">
@@ -483,7 +559,7 @@
                         <img src="${d.crop_url}" alt="Crop ${d.id}">
                     </div>
                     <div class="label-input-group">
-                        <div class="label-input-label">OCR Prediction (${(d.confidence*100).toFixed(0)}%)</div>
+                        <div class="label-input-label">پیش‌بینی OCR (${(d.confidence*100).toFixed(0)}%)</div>
                         <input type="text" class="crop-input" value="${d.user_verified_text}" 
                                onchange="saveText(${d.id}, this.value)"
                                onkeydown="if(event.key==='Enter') this.blur();">
@@ -571,11 +647,11 @@
             } else if (currentData) {
                 window.location.href = `/api/export_labelstudio/${currentData.base_name}`;
             } else {
-                alert('Please select or process a dataset first.');
+                alert('لطفاً ابتدا یک دیتاست را انتخاب یا پردازش کنید.');
             }
         }
 
-        function showLoading(show, text = "Processing dataset & running OCR...") {
+        function showLoading(show, text = "در حال پردازش و استخراج OCR...") {
             document.getElementById('loadingText').innerText = text;
             document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
         }
