@@ -1,0 +1,8 @@
+flask>=3.0.0
+easyocr>=1.7.0
+opencv-python-headless>=4.8.0
+numpy>=1.24.0
+boto3>=1.34.0
+gunicorn>=21.2.0
+torch
+torchvision
