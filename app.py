@@ -399,22 +399,29 @@ def minio_process_dataset_stream():
 
 @app.route('/api/minio/dataset_details/<dataset_name>')
 def minio_dataset_details(dataset_name):
-    s3 = minio_helper.get_s3_client()
-    prefix = f"processed_datasets/{dataset_name}/json/"
-    paginator = s3.get_paginator('list_objects_v2')
-    
-    all_json_data = []
-    for page in paginator.paginate(Bucket=minio_helper.MINIO_BUCKET, Prefix=prefix):
-        for obj in page.get('Contents', []):
-            json_data = minio_helper.read_json_from_minio(obj['Key'])
-            if json_data:
-                json_data['json_key'] = obj['Key']
-                all_json_data.append(json_data)
-                
-    return jsonify({
-        "dataset_name": dataset_name,
-        "charts": all_json_data
-    })
+    try:
+        s3 = minio_helper.get_s3_client()
+        prefix = f"processed_datasets/{dataset_name}/json/"
+        paginator = s3.get_paginator('list_objects_v2')
+        
+        all_json_data = []
+        for page in paginator.paginate(Bucket=minio_helper.MINIO_BUCKET, Prefix=prefix):
+            for obj in page.get('Contents', []):
+                json_data = minio_helper.read_json_from_minio(obj['Key'])
+                if json_data:
+                    json_data['json_key'] = obj['Key']
+                    all_json_data.append(json_data)
+                    
+        return jsonify({
+            "dataset_name": dataset_name,
+            "charts": all_json_data
+        })
+    except Exception as e:
+        print(f"Error loading dataset details for {dataset_name}: {e}")
+        return jsonify({
+            "dataset_name": dataset_name,
+            "charts": []
+        })
 
 @app.route('/api/minio/update_crop_label', methods=['POST'])
 def minio_update_crop_label():
