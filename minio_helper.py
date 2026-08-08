@@ -6,7 +6,7 @@ import boto3
 from botocore.client import Config
 from botocore.exceptions import ClientError
 
-MINIO_ENDPOINT = os.environ.get('MINIO_ENDPOINT', 'http://minio:9000')
+MINIO_ENDPOINT = os.environ.get('MINIO_ENDPOINT', 'https://upload.hamalv.ir')
 MINIO_ACCESS_KEY = os.environ.get('MINIO_ACCESS_KEY', 'minioadmin')
 MINIO_SECRET_KEY = os.environ.get('MINIO_SECRET_KEY', '1MP6rLEyoGKVAoUaNJoMDW2F')
 MINIO_BUCKET = os.environ.get('MINIO_BUCKET', 'chart-ocr-datasets')
@@ -19,10 +19,6 @@ def get_s3_client():
     return session.client(
         's3',
         endpoint_url=MINIO_ENDPOINT,
-        config=Config(
-            signature_version='s3v4',
-            s3={'addressing_style': 'path'}
-        ),
         region_name='us-east-1'
     )
 
