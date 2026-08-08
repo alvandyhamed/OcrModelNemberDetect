@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  chart-ocr:
+    build: .
+    container_name: chart-ocr-app
+    restart: always
+    ports:
+      - "5050:5050"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./extracted_output:/app/extracted_output
+    networks:
+      - web
+
+networks:
+  web:
+    external: true

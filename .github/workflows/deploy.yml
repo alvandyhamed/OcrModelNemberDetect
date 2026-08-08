@@ -1,0 +1,40 @@
+name: Auto Deploy to Production Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Build & Deploy via SSH
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Remote Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASS }}
+          script: |
+            echo "Starting deployment on server..."
+            
+            # Clone repo if not existing
+            if [ ! -d "/home/hamed/OcrModelNemberDetect" ]; then
+              echo "Cloning repository..."
+              git clone https://github.com/alvandyhamed/OcrModelNemberDetect.git /home/hamed/OcrModelNemberDetect
+            fi
+            
+            cd /home/hamed/OcrModelNemberDetect
+            git fetch origin main
+            git reset --hard origin/main
+            
+            echo "Building and launching docker container..."
+            docker compose down || true
+            docker compose up -d --build
+            
+            echo "Deployment successful!"
